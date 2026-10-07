@@ -13,9 +13,17 @@ namespace HeadTracked.Display
         public int frameWidth;
         public int frameHeight;
         public float confidence;
+        // Projected length of the face's local horizontal axis divided by its 3D length.
+        // Zero means that the source did not provide a face orientation (legacy protocol).
+        public float eyeSpanForeshortening;
         public double receivedAtSeconds;
 
+        public float EyeSpanForeshortening => eyeSpanForeshortening > 0f &&
+            !float.IsNaN(eyeSpanForeshortening) && !float.IsInfinity(eyeSpanForeshortening)
+                ? Mathf.Clamp(eyeSpanForeshortening, 0.25f, 1f) : 1f;
+
         public bool IsUsable => found && frameWidth > 0 && frameHeight > 0 &&
-            confidence > 0f && Vector2.Distance(leftEye, rightEye) > 0.005f;
+            confidence > 0f && Vector2.Distance(leftEye, rightEye) > 0.005f &&
+            (eyeSpanForeshortening <= 0f || eyeSpanForeshortening >= 0.25f);
     }
 }

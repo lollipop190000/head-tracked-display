@@ -105,7 +105,8 @@ namespace HeadTracked.Display
                 var options = new FaceLandmarkerOptions(
                     baseOptions: new BaseOptions(BaseOptions.Delegate.CPU, modelAssetBuffer: File.ReadAllBytes(modelPath)),
                     runningMode: RunningMode.VIDEO,
-                    numFaces: 1);
+                    numFaces: 1,
+                    outputFaceTransformationMatrixes: true);
                 landmarker = FaceLandmarker.CreateFromOptions(options);
                 textureFrame = new Mediapipe.Unity.Experimental.TextureFrame(webcam.width, webcam.height, TextureFormat.RGBA32);
             }
@@ -157,6 +158,15 @@ namespace HeadTracked.Display
                                         (points[33].y + points[133].y) * 0.5f);
                                     observation.rightEye = new Vector2((points[263].x + points[362].x) * 0.5f,
                                         (points[263].y + points[362].y) * 0.5f);
+                                    if (result.facialTransformationMatrixes != null &&
+                                        result.facialTransformationMatrixes.Count > 0)
+                                    {
+                                        var axis = result.facialTransformationMatrixes[0].GetColumn(0);
+                                        float length = new Vector3(axis.x, axis.y, axis.z).magnitude;
+                                        if (length > 0.0001f)
+                                            observation.eyeSpanForeshortening =
+                                                Mathf.Clamp01(new Vector2(axis.x, axis.y).magnitude / length);
+                                    }
                                 }
                             }
                             latest = observation;

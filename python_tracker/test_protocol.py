@@ -3,6 +3,8 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+import numpy as np
+
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from tracker import observation
 
@@ -24,6 +26,15 @@ class ProtocolTests(unittest.TestCase):
         self.assertTrue(value["found"])
         self.assertAlmostEqual(value["leftX"], 0.3)
         self.assertAlmostEqual(value["rightX"], 0.7)
+
+    def test_face_yaw_reports_eye_span_foreshortening(self):
+        matrix = np.eye(4)
+        matrix[0, 0] = 0.5
+        matrix[2, 0] = np.sqrt(3) / 2
+        points = [SimpleNamespace(x=0.5, y=0.5) for _ in range(478)]
+        value = observation(SimpleNamespace(
+            face_landmarks=[points], facial_transformation_matrixes=[matrix]), 640, 480)
+        self.assertAlmostEqual(value["eyeSpanForeshortening"], 0.5)
 
 
 if __name__ == "__main__":

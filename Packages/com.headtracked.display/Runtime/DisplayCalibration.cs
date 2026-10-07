@@ -47,7 +47,7 @@ namespace HeadTracked.Display
             if (!observation.IsUsable) return false;
             Vector2 delta = observation.leftEye - observation.rightEye;
             referenceEyeSpanPixels = new Vector2(delta.x * observation.frameWidth,
-                delta.y * observation.frameHeight).magnitude;
+                delta.y * observation.frameHeight).magnitude / observation.EyeSpanForeshortening;
             referenceFrameWidth = observation.frameWidth;
             return referenceEyeSpanPixels > 1f;
         }

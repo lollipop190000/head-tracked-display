@@ -29,6 +29,23 @@ namespace HeadTracked.Display.Tests
                 Is.EqualTo(1f).Within(1e-5f));
         }
 
+        [TestCase(0.12f, 0.03f, -0.6f, -0.08f, 0.04f, 0.4f)]
+        [TestCase(-0.1f, -0.05f, -0.4f, 0.05f, -0.03f, -0.1f)]
+        [TestCase(0.03f, 0.07f, -0.9f, 0.17f, 0.1f, 0.8f)]
+        public void ProjectionEqualsThePhysicalEyeScreenObjectSightline(
+            float ex, float ey, float ez, float px, float py, float pz)
+        {
+            const float width = 0.53f, height = 0.30f;
+            var eye = new Vector3(ex, ey, ez);
+            var point = new Vector3(px, py, pz);
+            float fractionToScreen = -eye.z / (point.z - eye.z);
+            Vector3 physicalScreenHit = Vector3.LerpUnclamped(eye, point, fractionToScreen);
+            var projected = ScreenPoint(OffAxisProjection.Calculate(eye, width, height, .025f, 10f),
+                eye, point);
+            Assert.That(projected.x, Is.EqualTo(physicalScreenHit.x * 2f / width).Within(1e-5f));
+            Assert.That(projected.y, Is.EqualTo(physicalScreenHit.y * 2f / height).Within(1e-5f));
+        }
+
         [Test]
         public void MovingRightShowsOppositeParallaxForObjectsAtDifferentDepths()
         {
@@ -95,6 +112,63 @@ namespace HeadTracked.Display.Tests
             observation.rightEye.x = .6f;
             Assert.That(EyePoseEstimator.TryEstimate(observation, calibration, out Vector3 closer), Is.True);
             Assert.That(closer.z, Is.EqualTo(-.3f).Within(1e-4f));
+        }
+
+        [Test]
+        public void TurningFaceWithoutMovingEyesDoesNotFakeDistanceInBasicMode()
+        {
+            var calibration = new DisplayCalibration
+            {
+                webcamPosition = Vector3.zero,
+                referenceEyeDistanceFromScreen = .6f,
+                mirrorImageX = false
+            };
+            var frontal = EyeObservation(.1f, 1f);
+            Assert.That(calibration.CaptureReference(frontal), Is.True);
+            Assert.That(EyePoseEstimator.TryEstimate(frontal, calibration, out Vector3 baseline), Is.True);
+            var turned = EyeObservation(.05f, .5f);
+            Assert.That(EyePoseEstimator.TryEstimate(turned, calibration, out Vector3 atYaw), Is.True);
+            Assert.That(atYaw.z, Is.EqualTo(baseline.z).Within(1e-4f));
+            Assert.That(atYaw.x, Is.EqualTo(baseline.x).Within(1e-4f));
+
+            Assert.That(calibration.CaptureReference(turned), Is.True);
+            Assert.That(EyePoseEstimator.TryEstimate(frontal, calibration, out Vector3 frontalAgain), Is.True);
+            Assert.That(frontalAgain.z, Is.EqualTo(-.6f).Within(1e-4f));
+        }
+
+        [Test]
+        public void TurningFaceWithoutMovingEyesDoesNotFakeDistanceInPreciseMode()
+        {
+            var calibration = new DisplayCalibration
+            {
+                webcamPosition = Vector3.zero,
+                usePreciseIntrinsics = true,
+                focalXPixels = 600f,
+                focalYPixels = 600f,
+                principalXPixels = 320f,
+                principalYPixels = 240f,
+                measuredEyeSeparationMeters = .063f,
+                mirrorImageX = false
+            };
+            Assert.That(EyePoseEstimator.TryEstimate(EyeObservation(.1f, 1f), calibration,
+                out Vector3 baseline), Is.True);
+            Assert.That(EyePoseEstimator.TryEstimate(EyeObservation(.05f, .5f), calibration,
+                out Vector3 atYaw), Is.True);
+            Assert.That(atYaw.z, Is.EqualTo(baseline.z).Within(1e-4f));
+        }
+
+        private static HeadObservation EyeObservation(float horizontalSpan, float foreshortening)
+        {
+            return new HeadObservation
+            {
+                found = true,
+                confidence = 1f,
+                frameWidth = 640,
+                frameHeight = 480,
+                leftEye = new Vector2(.5f - horizontalSpan * .5f, .5f),
+                rightEye = new Vector2(.5f + horizontalSpan * .5f, .5f),
+                eyeSpanForeshortening = foreshortening
+            };
         }
     }
 }

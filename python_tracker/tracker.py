@@ -1,6 +1,7 @@
 """Webcam Face Landmarker -> loopback TCP JSON lines consumed by PythonBridgeSource."""
 import argparse
 import json
+import math
 from pathlib import Path
 import socket
 import time
@@ -25,16 +26,30 @@ def eye_center(points, a: int, b: int) -> tuple[float, float]:
     return ((points[a].x + points[b].x) / 2, (points[a].y + points[b].y) / 2)
 
 
+def eye_span_foreshortening(result) -> float:
+    matrices = getattr(result, "facial_transformation_matrixes", None)
+    if matrices is None or len(matrices) == 0:
+        return 0.0
+    matrix = matrices[0]
+    x, y, z = float(matrix[0, 0]), float(matrix[1, 0]), float(matrix[2, 0])
+    length = math.sqrt(x * x + y * y + z * z)
+    if not math.isfinite(length) or length < 1e-5:
+        return 0.0
+    return min(1.0, math.hypot(x, y) / length)
+
+
 def observation(result, width: int, height: int) -> dict:
     message = {"found": False, "leftX": 0.0, "leftY": 0.0,
                "rightX": 0.0, "rightY": 0.0,
-               "width": width, "height": height, "confidence": 0.0}
+               "width": width, "height": height, "confidence": 0.0,
+               "eyeSpanForeshortening": 0.0}
     if result.face_landmarks:
         points = result.face_landmarks[0]
         left = eye_center(points, 33, 133)
         right = eye_center(points, 263, 362)
         message.update(found=True, leftX=left[0], leftY=left[1],
-                       rightX=right[0], rightY=right[1], confidence=1.0)
+                       rightX=right[0], rightY=right[1], confidence=1.0,
+                       eyeSpanForeshortening=eye_span_foreshortening(result))
     return message
 
 
@@ -55,7 +70,8 @@ def run(args: argparse.Namespace) -> None:
     options = mp.tasks.vision.FaceLandmarkerOptions(
         base_options=mp.tasks.BaseOptions(model_asset_path=str(model)),
         running_mode=mp.tasks.vision.RunningMode.VIDEO,
-        num_faces=1)
+        num_faces=1,
+        output_facial_transformation_matrixes=True)
     connection = None
     last_connect_attempt = 0.0
     last_timestamp = -1

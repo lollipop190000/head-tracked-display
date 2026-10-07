@@ -101,6 +101,7 @@ namespace HeadTracked.Display
                     frameWidth = wire.width,
                     frameHeight = wire.height,
                     confidence = wire.confidence,
+                    eyeSpanForeshortening = wire.eyeSpanForeshortening,
                     receivedAtSeconds = Time.realtimeSinceStartupAsDouble
                 };
                 received = true;
@@ -128,6 +129,7 @@ namespace HeadTracked.Display
             public int width;
             public int height;
             public float confidence;
+            public float eyeSpanForeshortening;
         }
     }
 }

@@ -16,4 +16,6 @@ In Unity Package Manager, select **Add package from disk** and choose this folde
 
 `EyePositionMeters`, `IsTracking`, `Confidence`, `SourceStatus`, and `PoseUpdated` expose the tracking result for game interaction. `Confidence` is currently a binary face found value, not a graded landmark quality score. When tracking times out, the view eases back to the neutral position.
 
+The render camera keeps the screen plane's orientation: turning the viewer's face does not rotate the scene. Both MediaPipe sources use face orientation only to compensate for the apparent narrowing of eye spacing during yaw, which would otherwise be mistaken for a change in viewing distance. The projection maps every fixed 3D point to the ray from the measured eye through the physical screen.
+
 See the [repository README](https://github.com/lollipop190000/head-tracked-display) for the Python tracker, native plugin, checkerboard calibration, and demo instructions. MIT license; see `LICENSE.md`.

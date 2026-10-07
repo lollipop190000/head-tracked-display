@@ -29,6 +29,7 @@ namespace HeadTracked.Display
             Vector2 eyeDelta = observation.leftEye - observation.rightEye;
             float spanPixels = new Vector2(eyeDelta.x * width, eyeDelta.y * height).magnitude;
             if (spanPixels < 1f) return false;
+            float foreshortening = observation.EyeSpanForeshortening;
 
             Vector2 leftPixels = new Vector2(observation.leftEye.x * width, observation.leftEye.y * height);
             Vector2 rightPixels = new Vector2(observation.rightEye.x * width, observation.rightEye.y * height);
@@ -45,13 +46,13 @@ namespace HeadTracked.Display
             {
                 float raySpan = Vector2.Distance(leftRay, rightRay);
                 if (raySpan < 0.001f) return false;
-                cameraToEye = calibration.measuredEyeSeparationMeters / raySpan;
+                cameraToEye = calibration.measuredEyeSeparationMeters * foreshortening / raySpan;
             }
             else if (calibration.referenceEyeSpanPixels > 1f && calibration.referenceFrameWidth > 0)
             {
                 float referenceSpan = calibration.referenceEyeSpanPixels * width / calibration.referenceFrameWidth;
                 cameraToEye = (calibration.referenceEyeDistanceFromScreen + calibration.webcamPosition.z) *
-                              referenceSpan / spanPixels;
+                              referenceSpan * foreshortening / spanPixels;
             }
             else
             {
