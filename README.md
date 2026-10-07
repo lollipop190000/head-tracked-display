@@ -10,6 +10,12 @@
 - `Demo`: Unity 6.3 LTS + URP 시연 프로젝트. Kenney의 FBX 메시 3개와 앞뒤 깊이를 확인할 수 있는 장면을 생성합니다.
 - `python_tracker`: 공식 MediaPipe Python 추적 프로그램 및 카메라 정밀 보정 도구.
 
+## 이 PC에서 바로 테스트 (Windows)
+
+`Run-HeadTrackedDemo.cmd`를 더블클릭하면 로컬 Windows 빌드와 Python 웹캠 추적기가 함께 시작됩니다. 기본 웹캠은 0번입니다. 1번 웹캠을 쓰려면 PowerShell에서 `./Run-HeadTrackedDemo.cmd 1`을 실행합니다. 시연 앱은 전체 화면으로 열리며 **Alt+F4**로 닫으면 추적기도 종료됩니다. 화면 왼쪽의 **Tracking: FACE FOUND**를 확인하고 좌우·상하·앞뒤로 머리를 움직여 보세요. **NO FACE**라면 웹캠 번호와 조명을 확인합니다. 그다음 실제 화면 크기와 웹캠 위치를 입력하고 기준 거리에서 **Capture reference distance**를 누릅니다.
+
+로컬 빌드는 `Builds/HeadTrackedDemo/HeadTrackedDemo.exe`에 있으며 Git에는 포함하지 않습니다. 새로 내려받은 저장소에서는 아래 설치 절차를 따른 뒤 Unity 6.3 Editor에서 Windows x64 빌드를 만들어야 합니다.
+
 ## 빠른 시작: Python 추적
 
 1. Unity Hub에서 **Unity 6.3 LTS** Editor를 설치하고 `Demo` 폴더를 프로젝트로 엽니다. 이 저장소의 `Demo/Packages/manifest.json`은 옆에 있는 로컬 패키지를 참조합니다.
