@@ -78,6 +78,7 @@ namespace HeadTracked.Demo
             sun.intensity = 1.35f;
             sun.shadows = LightShadows.Soft;
             sun.transform.rotation = Quaternion.Euler(42f, -38f, 0f);
+            RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.40f, 0.43f, 0.48f);
         }
 

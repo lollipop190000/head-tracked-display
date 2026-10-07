@@ -19,7 +19,7 @@
    python python_tracker/download_model.py
    ```
 
-3. Unity 메뉴 **Head Tracked → Create or refresh demo scene**을 한 번 실행해 URP 설정을 생성합니다. `Assets/Scenes/HeadTrackedDemo.unity`에서 Play를 누릅니다.
+3. Unity 메뉴 **Head Tracked → Create or refresh demo scene**을 한 번 실행해 URP 설정을 생성합니다. `Assets/Scenes/HeadTrackedDemo.unity`에서 Play를 누르면 환경과 FBX 모델이 생성됩니다.
 4. 별도 PowerShell에서 추적기를 실행합니다. 카메라 목록은 `--list-cameras`로 확인하고 다른 웹캠은 `--camera 1`처럼 지정합니다.
 
    ```powershell
