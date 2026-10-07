@@ -4,6 +4,6 @@
 *.md text eol=lf
 *.py text eol=lf
 *.unity text eol=lf
-*.asset text eol=lf
-*.meta text eol=lf
+*.asset text eol=lf -whitespace
+*.meta text eol=lf -whitespace
 *.fbx binary

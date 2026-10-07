@@ -13,6 +13,9 @@ python_tracker/.venv/
 python_tracker/face_landmarker.task
 python_tracker/calibration.json
 Demo/Assets/StreamingAssets/face_landmarker.task
+Demo/Assets/StreamingAssets/face_landmarker.task.meta
 Demo/Assets/StreamingAssets/camera_intrinsics.json
+Demo/Assets/StreamingAssets/camera_intrinsics.json.meta
 *.unitypackage
 Demo/Packages/com.github.homuler.mediapipe-*.tgz
+Demo/*.log

@@ -28,6 +28,8 @@ def main() -> None:
     if digest != SHA256:
         raise RuntimeError("The plugin SHA-256 differs from the official release; remove it and retry.")
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    # The upstream package uses AssetBundleResourceManager but omits this built-in module dependency.
+    manifest["dependencies"]["com.unity.modules.assetbundle"] = "1.0.0"
     manifest["dependencies"]["com.github.homuler.mediapipe"] = "file:" + FILE_NAME
     MANIFEST_PATH.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     print(f"MediaPipe Unity Plugin {VERSION} is ready in {MANIFEST_PATH}")

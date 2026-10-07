@@ -5,6 +5,6 @@
   "autoReferenced": true,
   "defineConstraints": ["HEADTRACKED_MEDIAPIPE"],
   "versionDefines": [
-    {"name": "com.github.homuler.mediapipe", "expression": "[0.16.3,)", "define": "HEADTRACKED_MEDIAPIPE"}
+    {"name": "com.github.homuler.mediapipe", "expression": "[0.16.3,1.0.0)", "define": "HEADTRACKED_MEDIAPIPE"}
   ]
 }

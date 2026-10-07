@@ -2,6 +2,8 @@
 
 일반 모니터를 3D 공간의 창처럼 보이게 하는 Unity 패키지입니다. 웹캠에서 두 눈의 중심을 추적하고 화면의 실제 크기와 관찰자 위치로 **off-axis projection**을 계산합니다. 장면 전체에 적용되므로 3D 모델마다 추적 스크립트를 붙일 필요가 없습니다. 한 사람을 위한 단안 화면 효과이며 입체 디스플레이는 아닙니다.
 
+![Unity URP 시연 장면의 기본 시점](docs/demo-neutral.png)
+
 ## 구성
 
 - `Packages/com.headtracked.display`: 재사용 가능한 Unity Package Manager 패키지. `HeadTrackedDisplay`, 보정 데이터, 투영 계산, Python TCP 추적 소스가 들어 있습니다. MediaPipe Unity Plugin을 설치하면 Unity 내부 추적 소스도 활성화됩니다.
@@ -62,7 +64,8 @@ Unity Package Manager에서 `Packages/com.headtracked.display/package.json`을 �
 ## 확인과 제한
 
 - Python 프로토콜 검사: `python_tracker/.venv/Scripts/python.exe -m unittest discover -s python_tracker -p 'test_*.py' -v`
-- Unity 계산 검사: Test Runner의 EditMode에서 `HeadTracked.Display.Tests` 실행. 화면 네 모서리 투영, 앞뒤 물체의 시차 방향, 기준 거리 보정을 검사합니다.
+- Unity 계산 검사: Test Runner의 EditMode에서 `HeadTracked.Display.Tests` 실행. 화면 네 모서리 투영, 좌우·상하 시차, 앞뒤 거리 변화, 기준 거리 보정을 검사합니다.
+- Unity 장면 검사: PlayMode의 `HeadTracked.Demo.SceneTests`는 실제 FBX 메시가 화면 앞뒤에 생성되고 모델별 스크립트 없이 동작하는지 확인합니다. 네이티브 플러그인과 모델 파일을 설치하면 `NativeWebcamTests`가 실제 웹캠 프레임 처리도 확인합니다.
 - 실제 장비 검사: 얼굴 소실·재진입, 좌우 반전, 웹캠 전환, Python/Unity 두 소스를 각각 확인합니다.
 
 화면 앞에 있는 물체는 모니터 테두리에서 잘립니다. 조명과 재질은 시연 장면의 예시이며, 실제 방의 조명과 모니터 색을 맞추면 물체의 존재감이 더 좋아집니다. 현재 구현은 한 사람의 두 눈 중심 위치를 사용하며 개별 눈 영상이나 다중 관찰자 시점은 제공하지 않습니다.

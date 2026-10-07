@@ -111,7 +111,7 @@ namespace HeadTracked.Display
             }
             catch (Exception ex)
             {
-                landmarker?.Dispose();
+                landmarker?.Close();
                 status = "MediaPipe initialization failed: " + ex.Message;
                 StopWebcam();
                 yield break;

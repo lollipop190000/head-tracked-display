@@ -6,5 +6,8 @@
   "unity": "6000.3",
   "author": { "name": "Head Tracked Display contributors" },
   "license": "MIT",
+  "dependencies": {
+    "com.unity.modules.audio": "1.0.0"
+  },
   "keywords": ["head-tracking", "off-axis", "parallax", "display"]
 }

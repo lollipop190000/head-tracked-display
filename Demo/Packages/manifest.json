@@ -1,6 +1,9 @@
 {
   "dependencies": {
     "com.headtracked.display": "file:../../Packages/com.headtracked.display",
+    "com.unity.modules.audio": "1.0.0",
+    "com.unity.modules.assetbundle": "1.0.0",
+    "com.unity.modules.imageconversion": "1.0.0",
     "com.unity.render-pipelines.universal": "17.3.0",
     "com.unity.test-framework": "1.6.0"
   },

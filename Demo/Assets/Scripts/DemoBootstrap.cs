@@ -60,16 +60,16 @@ namespace HeadTracked.Demo
                 new Color(0.28f, 0.30f, 0.32f));
             MakeBox("Back wall", new Vector3(0f, 0.25f, 1.12f), new Vector3(1.55f, 0.9f, 0.02f),
                 new Color(0.18f, 0.22f, 0.27f));
-            MakeBox("Rear plinth", new Vector3(0.22f, -0.12f, 0.42f), new Vector3(0.28f, 0.12f, 0.28f),
+            MakeBox("Rear plinth", new Vector3(0.20f, -0.13f, 0.42f), new Vector3(0.20f, 0.10f, 0.20f),
                 new Color(0.55f, 0.48f, 0.38f));
-            MakeBox("Front plinth", new Vector3(-0.19f, -0.13f, -0.035f), new Vector3(0.16f, 0.1f, 0.16f),
+            MakeBox("Front plinth", new Vector3(-0.16f, -0.13f, -0.035f), new Vector3(0.14f, 0.10f, 0.14f),
                 new Color(0.49f, 0.44f, 0.37f));
 
-            AddModel("Models/bear", "Bear, in front of screen", new Vector3(-0.19f, -0.07f, -0.035f),
+            AddModel("Models/bear", "Bear, in front of screen", new Vector3(-0.16f, -0.015f, -0.04f),
                 0.15f, new Color(0.88f, 0.61f, 0.32f));
-            AddModel("Models/chairDesk", "Chair, behind screen", new Vector3(0.03f, -0.08f, 0.29f),
+            AddModel("Models/chairDesk", "Chair, behind screen", new Vector3(-0.01f, -0.055f, 0.29f),
                 0.25f, new Color(0.44f, 0.68f, 0.81f));
-            AddModel("Models/pottedPlant", "Plant, behind chair", new Vector3(0.23f, -0.04f, 0.45f),
+            AddModel("Models/pottedPlant", "Plant, behind chair", new Vector3(0.20f, 0.03f, 0.42f),
                 0.22f, new Color(0.55f, 0.76f, 0.53f));
 
             var sun = new GameObject("Soft key light").AddComponent<Light>();

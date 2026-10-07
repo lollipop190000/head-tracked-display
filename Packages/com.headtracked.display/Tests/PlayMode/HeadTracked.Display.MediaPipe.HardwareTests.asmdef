@@ -1,0 +1,11 @@
+{
+  "name": "HeadTracked.Display.MediaPipe.HardwareTests",
+  "rootNamespace": "HeadTracked.Display.Tests",
+  "references": ["HeadTracked.Display", "HeadTracked.Display.MediaPipe"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false,
+  "defineConstraints": ["HEADTRACKED_MEDIAPIPE"],
+  "versionDefines": [
+    {"name": "com.github.homuler.mediapipe", "expression": "[0.16.3,1.0.0)", "define": "HEADTRACKED_MEDIAPIPE"}
+  ]
+}
