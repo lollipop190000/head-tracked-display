@@ -31,7 +31,8 @@ try {
         $details = if (Test-Path -LiteralPath $errorLog) { Get-Content -LiteralPath $errorLog -Raw } else { '' }
         throw "Webcam tracker stopped before the demo opened. $details"
     }
-    & $gameExe
+    Start-Process -FilePath $gameExe -WorkingDirectory (Split-Path -Parent $gameExe) `
+        -WindowStyle Normal -Wait
 }
 finally {
     $tracker.Refresh()
