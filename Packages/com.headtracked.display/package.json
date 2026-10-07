@@ -1,0 +1,10 @@
+{
+  "name": "com.headtracked.display",
+  "version": "0.1.0",
+  "displayName": "Head Tracked Display",
+  "description": "Single-viewer off-axis projection for a physical monitor, with interchangeable face trackers.",
+  "unity": "6000.3",
+  "author": { "name": "Head Tracked Display contributors" },
+  "license": "MIT",
+  "keywords": ["head-tracking", "off-axis", "parallax", "display"]
+}

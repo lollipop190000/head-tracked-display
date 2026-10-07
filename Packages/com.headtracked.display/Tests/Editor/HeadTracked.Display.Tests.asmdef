@@ -1,0 +1,8 @@
+{
+  "name": "HeadTracked.Display.Tests",
+  "rootNamespace": "HeadTracked.Display.Tests",
+  "references": ["HeadTracked.Display"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

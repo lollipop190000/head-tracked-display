@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "com.headtracked.display": "file:../../Packages/com.headtracked.display",
+    "com.unity.render-pipelines.universal": "17.3.0",
+    "com.unity.test-framework": "1.6.0"
+  },
+  "testables": [
+    "com.headtracked.display"
+  ]
+}
