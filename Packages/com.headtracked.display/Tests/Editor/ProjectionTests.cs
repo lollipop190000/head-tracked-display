@@ -46,6 +46,34 @@ namespace HeadTracked.Display.Tests
             Assert.That(projected.y, Is.EqualTo(physicalScreenHit.y * 2f / height).Within(1e-5f));
         }
 
+        [TestCase(0.12f, 0.03f, -0.6f, -0.08f, 0.04f, 0.4f)]
+        [TestCase(-0.1f, -0.05f, -0.4f, 0.05f, -0.03f, -0.1f)]
+        public void UnityCameraViewportMatchesThePhysicalSightline(
+            float ex, float ey, float ez, float px, float py, float pz)
+        {
+            const float width = .53f, height = .30f;
+            var eye = new Vector3(ex, ey, ez);
+            var point = new Vector3(px, py, pz);
+            var cameraObject = new GameObject("Projection test camera");
+            try
+            {
+                var camera = cameraObject.AddComponent<Camera>();
+                camera.transform.SetPositionAndRotation(eye, Quaternion.identity);
+                camera.nearClipPlane = .025f;
+                camera.farClipPlane = 10f;
+                camera.projectionMatrix = OffAxisProjection.Calculate(eye, width, height, .025f, 10f);
+                float fractionToScreen = -eye.z / (point.z - eye.z);
+                Vector3 screenHit = Vector3.LerpUnclamped(eye, point, fractionToScreen);
+                Vector3 viewport = camera.WorldToViewportPoint(point);
+                Assert.That(viewport.x, Is.EqualTo(.5f + screenHit.x / width).Within(1e-5f));
+                Assert.That(viewport.y, Is.EqualTo(.5f + screenHit.y / height).Within(1e-5f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(cameraObject);
+            }
+        }
+
         [Test]
         public void MovingRightShowsOppositeParallaxForObjectsAtDifferentDepths()
         {

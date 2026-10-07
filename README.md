@@ -114,7 +114,7 @@ Game code can read `EyePositionMeters`, `IsTracking`, `Confidence`, and `SourceS
 
 ## Validation and limitations
 
-The automated suite checks screen corners, physical eye-to-object sightlines at multiple depths, parallax direction and scale, and yaw-compensated distance in basic and precise modes. The latest run passed **12/12 Unity EditMode**, **2/2 Unity PlayMode with the optional plugin**, and **3/3 Python protocol** tests. Run them with Unity Test Runner's EditMode and PlayMode tabs, and run the Python tests with:
+The automated suite checks screen corners, physical eye-to-object sightlines at multiple depths, Unity's actual camera viewport projection, parallax direction and scale, and yaw-compensated distance in basic and precise modes. The latest run passed **14/14 Unity EditMode**, **2/2 Unity PlayMode with the optional plugin**, and **3/3 Python protocol** tests. Run them with Unity Test Runner's EditMode and PlayMode tabs, and run the Python tests with:
 
 ```powershell
 ./python_tracker/.venv/Scripts/python.exe -m unittest discover -s python_tracker -p 'test_*.py' -v
