@@ -66,7 +66,8 @@ Unity Package Manager에서 `Packages/com.headtracked.display/package.json`을 �
 - Python 프로토콜 검사: `python_tracker/.venv/Scripts/python.exe -m unittest discover -s python_tracker -p 'test_*.py' -v`
 - Unity 계산 검사: Test Runner의 EditMode에서 `HeadTracked.Display.Tests` 실행. 화면 네 모서리 투영, 좌우·상하 시차, 앞뒤 거리 변화, 기준 거리 보정을 검사합니다.
 - Unity 장면 검사: PlayMode의 `HeadTracked.Demo.SceneTests`는 실제 FBX 메시가 화면 앞뒤에 생성되고 모델별 스크립트 없이 동작하는지 확인합니다. 네이티브 플러그인과 모델 파일을 설치하면 `NativeWebcamTests`가 실제 웹캠 프레임 처리도 확인합니다.
-- 실제 장비 검사: 얼굴 소실·재진입, 좌우 반전, 웹캠 전환, Python/Unity 두 소스를 각각 확인합니다.
+- 현재 자동 검증 결과: Unity EditMode 7/7, 시연 PlayMode 1/1, 네이티브 플러그인 실제 웹캠 프레임 처리 1/1, Python 프로토콜 2/2가 통과했습니다. 웹캠 0번과 1번에서 Python Face Landmarker가 각각 40프레임을 처리했습니다.
+- 사람이 카메라 앞에서 좌우·상하·앞뒤로 움직이는 검사와 얼굴 소실·재진입, 좌우 반전 확인은 아직 수행하지 못했습니다. 사용 시 두 추적 방식으로 각각 확인해야 합니다.
 
 화면 앞에 있는 물체는 모니터 테두리에서 잘립니다. 조명과 재질은 시연 장면의 예시이며, 실제 방의 조명과 모니터 색을 맞추면 물체의 존재감이 더 좋아집니다. 현재 구현은 한 사람의 두 눈 중심 위치를 사용하며 개별 눈 영상이나 다중 관찰자 시점은 제공하지 않습니다.
 
