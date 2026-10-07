@@ -17,21 +17,31 @@ namespace HeadTracked.Demo.Tests
             yield return null;
 
             var front = GameObject.Find("Bear, in front of screen");
+            var protruding = GameObject.Find("Plant, 18 cm in front of screen");
             var chair = GameObject.Find("Chair, behind screen");
             var plant = GameObject.Find("Plant, behind chair");
             Assert.That(front, Is.Not.Null);
+            Assert.That(protruding, Is.Not.Null);
             Assert.That(chair, Is.Not.Null);
             Assert.That(plant, Is.Not.Null);
             Assert.That(front.GetComponentInChildren<MeshFilter>(), Is.Not.Null);
+            Assert.That(protruding.GetComponentInChildren<MeshFilter>(), Is.Not.Null);
             Assert.That(chair.GetComponentInChildren<MeshFilter>(), Is.Not.Null);
             Assert.That(plant.GetComponentInChildren<MeshFilter>(), Is.Not.Null);
             Assert.That(front.GetComponentInChildren<Renderer>().bounds.center.z, Is.LessThan(0f));
+            Assert.That(protruding.GetComponentInChildren<Renderer>().bounds.center.z, Is.LessThan(-0.1f));
             Assert.That(chair.GetComponentInChildren<Renderer>().bounds.center.z, Is.GreaterThan(0f));
             Assert.That(plant.GetComponentInChildren<Renderer>().bounds.center.z, Is.GreaterThan(0f));
             Assert.That(front.GetComponentInChildren<HeadTrackedDisplay>(), Is.Null);
+            Assert.That(protruding.GetComponentInChildren<HeadTrackedDisplay>(), Is.Null);
             Assert.That(chair.GetComponentInChildren<HeadTrackedDisplay>(), Is.Null);
             Assert.That(plant.GetComponentInChildren<HeadTrackedDisplay>(), Is.Null);
             Assert.That(Camera.main.GetComponent<HeadTrackedDisplay>(), Is.Not.Null);
+            Vector3 protrudingViewport = Camera.main.WorldToViewportPoint(
+                protruding.GetComponentInChildren<Renderer>().bounds.center);
+            Assert.That(protrudingViewport.z, Is.GreaterThan(0f));
+            Assert.That(protrudingViewport.x, Is.InRange(0f, 1f));
+            Assert.That(protrudingViewport.y, Is.InRange(0f, 1f));
 
             string screenshotPath = System.Environment.GetEnvironmentVariable("HEADTRACK_CAPTURE");
             if (!string.IsNullOrEmpty(screenshotPath))

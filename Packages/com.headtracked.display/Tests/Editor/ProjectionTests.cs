@@ -32,6 +32,8 @@ namespace HeadTracked.Display.Tests
         [TestCase(0.12f, 0.03f, -0.6f, -0.08f, 0.04f, 0.4f)]
         [TestCase(-0.1f, -0.05f, -0.4f, 0.05f, -0.03f, -0.1f)]
         [TestCase(0.03f, 0.07f, -0.9f, 0.17f, 0.1f, 0.8f)]
+        [TestCase(-0.1f, 0.04f, -0.6f, 0.04f, -0.03f, -0.18f)]
+        [TestCase(0.1f, -0.04f, -0.6f, 0.04f, -0.03f, -0.18f)]
         public void ProjectionEqualsThePhysicalEyeScreenObjectSightline(
             float ex, float ey, float ez, float px, float py, float pz)
         {

@@ -56,7 +56,7 @@ namespace HeadTracked.Demo
 
         private void MakeEnvironment()
         {
-            MakeBox("Floor", new Vector3(0f, -0.19f, 0.53f), new Vector3(1.55f, 0.02f, 1.2f),
+            MakeBox("Floor", new Vector3(0f, -0.19f, 0.43f), new Vector3(1.55f, 0.02f, 1.42f),
                 new Color(0.28f, 0.30f, 0.32f));
             MakeBox("Back wall", new Vector3(0f, 0.25f, 1.12f), new Vector3(1.55f, 0.9f, 0.02f),
                 new Color(0.18f, 0.22f, 0.27f));
@@ -64,6 +64,8 @@ namespace HeadTracked.Demo
                 new Color(0.55f, 0.48f, 0.38f));
             MakeBox("Front plinth", new Vector3(-0.16f, -0.13f, -0.035f), new Vector3(0.14f, 0.10f, 0.14f),
                 new Color(0.49f, 0.44f, 0.37f));
+            MakeBox("Protruding plinth", new Vector3(0.04f, -0.13f, -0.18f), new Vector3(0.10f, 0.10f, 0.10f),
+                new Color(0.45f, 0.37f, 0.34f));
 
             AddModel("Models/bear", "Bear, in front of screen", new Vector3(-0.16f, -0.015f, -0.04f),
                 0.15f, new Color(0.88f, 0.61f, 0.32f));
@@ -71,6 +73,8 @@ namespace HeadTracked.Demo
                 0.25f, new Color(0.44f, 0.68f, 0.81f));
             AddModel("Models/pottedPlant", "Plant, behind chair", new Vector3(0.20f, 0.03f, 0.42f),
                 0.22f, new Color(0.55f, 0.76f, 0.53f));
+            AddModel("Models/pottedPlant", "Plant, 18 cm in front of screen", new Vector3(0.04f, -0.03f, -0.18f),
+                0.10f, new Color(0.90f, 0.46f, 0.33f));
 
             var sun = new GameObject("Soft key light").AddComponent<Light>();
             sun.type = LightType.Directional;
@@ -272,7 +276,8 @@ namespace HeadTracked.Demo
                         source.GetType().GetMethod("SelectWebcam")?.Invoke(source, new object[] { device.name });
             }
             GUILayout.Label(notice);
-            GUILayout.Label("Move left/right and forward/back. Models need no tracking scripts.");
+            GUILayout.Label("Move left/right and forward/back. The red plant is 18 cm in front of the screen.");
+            GUILayout.Label("Models need no tracking scripts; the monitor edge still clips them.");
             GUILayout.EndArea();
         }
 
