@@ -19,7 +19,7 @@ Disable **Use rigid face pose** to compare with the old eye-span estimator. Keep
 
 ## Forward/back distance calibration
 
-Close the demo and double-click **Run-DepthTest.cmd** (or pass `-Camera 1`). It opens three 15 cm plants: green at +5 cm, red at +30 cm, blue at +100 cm. The room and supports are hidden. **Restore all six models and original positions** recovers the original layout.
+Close the demo and double-click **Run-DepthTest.cmd** (or pass `-Camera 1`). It opens three 15 cm plants: left at +5 cm, middle at +30 cm, right at +100 cm. The room and supports are hidden. **Restore all models and original positions** recovers the original layout.
 
 1. Finish screen/webcam, IPD, reference capture, and any checkerboard setup first. Wait for a valid face fit. Changing this setup afterwards invalidates the distance correction.
 2. Measure the perpendicular distance from your eye midpoint to the **screen plane**, not the webcam. Enter it in **Near measured cm**, sit at that position facing forward, and press **Capture near**. Hold still while 20 new observations are collected.

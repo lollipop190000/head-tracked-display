@@ -86,6 +86,8 @@ namespace HeadTracked.Display
         private void LateUpdate()
         {
             if (!initialized) Awake();
+            if (calibration.deriveScreenHeightFromResolution && targetCamera.pixelWidth > 0 && targetCamera.pixelHeight > 0)
+                calibration.screenHeight = calibration.screenWidth * targetCamera.pixelHeight / targetCamera.pixelWidth;
             Vector3 estimated = NeutralEye;
             bool available = observationSource != null && observationSource.isActiveAndEnabled &&
                              observationSource.TryGetLatest(out latest);

@@ -14,6 +14,65 @@ namespace HeadTracked.Demo.Tests
     public sealed class SceneSmokeTests
     {
         [UnityTest]
+        public IEnumerator RealismStudyUsesPbrMapsAndPreservesSubmeshMaterials()
+        {
+            yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
+            yield return null;
+            var demo = Object.FindFirstObjectByType<DemoBootstrap>();
+            var original = Resources.Load<GameObject>("Models/pottedPlant").GetComponentsInChildren<Renderer>();
+            var placed = GameObject.Find("Plant, behind chair").GetComponentsInChildren<Renderer>();
+            for (int r = 0; r < original.Length; r++)
+            {
+                Assert.That(placed[r].sharedMaterials.Length, Is.EqualTo(original[r].sharedMaterials.Length));
+                for (int m = 0; m < original[r].sharedMaterials.Length; m++)
+                {
+                    var source = original[r].sharedMaterials[m];
+                    var result = placed[r].sharedMaterials[m];
+                    if (source.HasProperty("_Color")) Assert.That(result.color, Is.EqualTo(source.color));
+                    if (source.shader.name.StartsWith("Universal")) Assert.That(result, Is.SameAs(source));
+                }
+            }
+            demo.UseMaterialStudy();
+            var vase = GameObject.Find("Ceramic vase, measured surface comparison");
+            Assert.That(ModelBounds(vase).size.y, Is.EqualTo(.40f).Within(.001f));
+            Assert.That(ModelBounds(vase).min.y, Is.EqualTo(-.18f).Within(.001f));
+            var material = vase.GetComponentInChildren<Renderer>().sharedMaterial;
+            Assert.That(material.shader.name, Is.EqualTo("Universal Render Pipeline/Lit"));
+            foreach (string map in new[] { "_BaseMap", "_BumpMap", "_MetallicGlossMap", "_OcclusionMap" })
+                Assert.That(material.GetTexture(map), Is.Not.Null, map);
+            Assert.That(RenderSettings.customReflectionTexture, Is.Not.Null);
+            Assert.That(GameObject.Find("Brushed brass sphere"), Is.Not.Null);
+            var brass = GameObject.Find("Brushed brass sphere").GetComponent<Renderer>().sharedMaterial.GetColor("_BaseColor");
+            Assert.That(Vector4.Distance(brass, new Color(.64f, .44f, .18f)), Is.LessThan(1e-5f));
+            yield return null;
+            string path = System.Environment.GetEnvironmentVariable("HEADTRACK_CAPTURE_REALISM");
+            if (!string.IsNullOrEmpty(path))
+            {
+                var camera = Camera.main;
+                var target = new RenderTexture(1280, 800, 24) { antiAliasing = 4 };
+                var image = new Texture2D(1280, 800, TextureFormat.RGB24, false);
+                var active = RenderTexture.active;
+                try
+                {
+                    camera.targetTexture = target;
+                    camera.GetComponent<HeadTrackedDisplay>().Calibration.screenWidth = .34f;
+                    camera.gameObject.SendMessage("LateUpdate");
+                    camera.Render();
+                    RenderTexture.active = target;
+                    image.ReadPixels(new Rect(0, 0, 1280, 800), 0, 0);
+                    image.Apply();
+                    File.WriteAllBytes(path, image.EncodeToPNG());
+                }
+                finally
+                {
+                    camera.targetTexture = null;
+                    RenderTexture.active = active;
+                    Object.Destroy(image); Object.Destroy(target);
+                }
+            }
+        }
+
+        [UnityTest]
         public IEnumerator DepthPresetsChangePlacementWithoutResizingOrRotatingModels()
         {
             yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);

@@ -66,6 +66,11 @@ namespace HeadTracked.Demo
         private bool hasMeasurementOrigin;
         private readonly List<SceneModel> sceneModels = new List<SceneModel>();
         private Transform roomFloor, backWall;
+        private readonly ModelMaterials modelMaterials = new ModelMaterials();
+        private bool materialStudyActive, enhancedRendering = true, cleanView;
+        private GameObject surfaceComparisons;
+        private RenderQualitySettings renderQuality;
+        private float reportedScreenWidth, reportedScreenHeight;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureDemo()
@@ -92,7 +97,12 @@ namespace HeadTracked.Demo
             source = cameraObject.AddComponent<PythonBridgeSource>();
             display = cameraObject.AddComponent<HeadTrackedDisplay>();
             display.Configure(screenPlane, source);
+            display.Calibration.deriveScreenHeightFromResolution = true;
             LoadSettings();
+            if (!Application.isEditor) LoadHardwareScreenHint();
+            new GameObject("HDR lighting and neutral tonemapping").AddComponent<RealismLighting>().Configure(camera);
+            renderQuality = Resources.Load<RenderQualitySettings>("Realism/render_quality");
+            if (renderQuality != null) renderQuality.Apply(enhancedRendering);
             CopyFieldsFromCalibration();
             LoadIntrinsics();
             if (!Application.isEditor) LoadModelLayout();
@@ -111,6 +121,7 @@ namespace HeadTracked.Demo
                 motionTest = 3;
             }
             notice = "Python bridge selected. Start python_tracker/tracker.py or switch to Unity MediaPipe.";
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "--realism-test") >= 0) UseMaterialStudy();
         }
 
         private string GazeContext() => Screen.width + "x" + Screen.height + ":" + JsonUtility.ToJson(display.Calibration);
@@ -126,6 +137,7 @@ namespace HeadTracked.Demo
         private void Update()
         {
             if (display == null) return;
+            if (UnityEngine.Input.GetKeyDown(KeyCode.F1)) cleanView = !cleanView;
             if (Time.unscaledTime >= nextGazeContextCheck)
             {
                 currentGazeContext = GazeContext();
@@ -357,7 +369,7 @@ namespace HeadTracked.Demo
         private void DrawDepthPredictions()
         {
             float d = -display.EyePositionMeters.z;
-            GUILayout.Label("Equal 15 cm plants: green +5, red +30, blue +100 cm.");
+            GUILayout.Label("Equal 15 cm plants: left +5, middle +30, right +100 cm.");
             GUILayout.Label("Centre-plane prediction: physical screen height / visual angle.");
             foreach (int index in new[] { 2, 3, 5 })
             {
@@ -398,26 +410,79 @@ namespace HeadTracked.Demo
                 null, -.18f, new Color(0.68f, 0.50f, 0.91f));
             AddSceneModel("Distant plant", "Models/pottedPlant", "Plant, distant", .90f, 1.4f, 6.0f,
                 null, -.18f, new Color(0.40f, 0.72f, 0.90f));
+            AddSceneModel("Ceramic vase (PBR)", "Realism/ceramic_vase", "Ceramic vase, measured surface comparison", -.10f, .40f, .85f,
+                null, -.18f, Color.white);
+            var wood = Resources.Load<Material>("Realism/wood");
+            if (wood != null)
+            {
+                var floorMaterial = new Material(wood) { name = "Wood floor, world scale" };
+                foreach (string map in new[] { "_BaseMap", "_BumpMap", "_MetallicGlossMap", "_OcclusionMap" })
+                    floorMaterial.SetTextureScale(map, new Vector2(2, 4));
+                roomFloor.GetComponent<Renderer>().sharedMaterial = floorMaterial;
+            }
+            MakeSurfaceComparisons();
             UpdateRoomGeometry();
 
             var sun = new GameObject("Soft key light").AddComponent<Light>();
             sun.type = LightType.Directional;
             sun.color = new Color(1f, 0.94f, 0.85f);
-            sun.intensity = 1.35f;
+            sun.intensity = .85f;
             sun.shadows = LightShadows.Soft;
+            sun.shadowBias = .015f;
+            sun.shadowNormalBias = .02f;
             sun.transform.rotation = Quaternion.Euler(42f, -38f, 0f);
-            RenderSettings.ambientMode = AmbientMode.Flat;
-            RenderSettings.ambientLight = new Color(0.40f, 0.43f, 0.48f);
+            RenderSettings.ambientMode = AmbientMode.Trilight;
+            RenderSettings.ambientSkyColor = new Color(.26f, .29f, .32f);
+            RenderSettings.ambientEquatorColor = new Color(.13f, .14f, .15f);
+            RenderSettings.ambientGroundColor = new Color(.08f, .07f, .06f);
         }
 
         private static Material MakeMaterial(Color color)
         {
             var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
-            var material = new Material(shader) { color = color };
+            var fallback = Resources.Load<Material>("Realism/fallback");
+            var material = fallback != null ? new Material(fallback) : new Material(shader);
+            material.color = color;
+            if (material.HasProperty("_BaseColor")) material.SetColor("_BaseColor", color);
             if (material.HasProperty("_Metallic")) material.SetFloat("_Metallic", 0.08f);
             if (material.HasProperty("_Smoothness")) material.SetFloat("_Smoothness", 0.45f);
             return material;
         }
+
+        private void MakeSurfaceComparisons()
+        {
+            surfaceComparisons = new GameObject("Metal and roughness comparison");
+            for (int i = 0; i < 2; i++)
+            {
+                var ball = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                ball.name = i == 0 ? "Brushed brass sphere" : "Polished steel sphere";
+                ball.transform.SetParent(surfaceComparisons.transform);
+                ball.transform.localScale = Vector3.one * .08f;
+                ball.transform.position = new Vector3(.14f + i * .18f, -.14f, .80f + i * .10f);
+                var material = MakeMaterial(i == 0 ? new Color(.64f, .44f, .18f) : new Color(.72f, .75f, .78f));
+                material.SetFloat("_Metallic", 1f);
+                material.SetFloat("_Smoothness", i == 0 ? .58f : .90f);
+                ball.GetComponent<Renderer>().sharedMaterial = material;
+            }
+            surfaceComparisons.SetActive(false);
+        }
+
+        public void UseMaterialStudy()
+        {
+            ResetModelLayout();
+            isolatePlant = false; depthComparisonActive = false; materialStudyActive = true;
+            for (int i = 0; i < sceneModels.Count; i++)
+            {
+                sceneModels[i].root.gameObject.SetActive(i == 6);
+                if (sceneModels[i].plinth != null) sceneModels[i].plinth.gameObject.SetActive(false);
+            }
+            surfaceComparisons.SetActive(true);
+            roomFloor.gameObject.SetActive(true); backWall.gameObject.SetActive(true);
+            UpdateRoomGeometry();
+            showTrackingTest = false; showModelSettings = false;
+        }
+
+        private void OnDestroy() => modelMaterials.Dispose();
 
         private static Transform MakeBox(string name, Vector3 position, Vector3 scale, Color color)
         {
@@ -429,7 +494,7 @@ namespace HeadTracked.Demo
             return item.transform;
         }
 
-        private static Transform AddModel(string resource, string name, Vector3 centre, float height, Color color)
+        private Transform AddModel(string resource, string name, Vector3 centre, float height, Color color)
         {
             var asset = Resources.Load<GameObject>(resource);
             if (asset == null)
@@ -451,7 +516,7 @@ namespace HeadTracked.Demo
             {
                 bounds.Encapsulate(renderer.bounds);
                 var materials = renderer.sharedMaterials;
-                for (int i = 0; i < materials.Length; i++) materials[i] = material;
+                for (int i = 0; i < materials.Length; i++) materials[i] = modelMaterials.Prepare(materials[i], material);
                 renderer.sharedMaterials = materials;
                 renderer.shadowCastingMode = ShadowCastingMode.On;
                 renderer.receiveShadows = true;
@@ -524,6 +589,8 @@ namespace HeadTracked.Demo
 
         private void SetDepthComparisonVisibility()
         {
+            materialStudyActive = false;
+            if (surfaceComparisons != null) surfaceComparisons.SetActive(false);
             isolatePlant = false; depthComparisonActive = true;
             for (int i = 0; i < sceneModels.Count; i++)
             {
@@ -548,6 +615,8 @@ namespace HeadTracked.Demo
 
         public void SetPlantIsolation(bool isolate)
         {
+            materialStudyActive = false;
+            if (surfaceComparisons != null) surfaceComparisons.SetActive(false);
             depthComparisonActive = false;
             isolatePlant = isolate;
             for (int i = 0; i < sceneModels.Count; i++)
@@ -558,6 +627,7 @@ namespace HeadTracked.Demo
             }
             roomFloor.gameObject.SetActive(!isolate);
             backWall.gameObject.SetActive(!isolate);
+            if (!isolate) UpdateRoomGeometry();
         }
 
         private bool ApplyModelLayout()
@@ -608,6 +678,7 @@ namespace HeadTracked.Demo
             foreach (var model in sceneModels)
             {
                 Bounds bounds = ModelBounds(model.root);
+                if (!model.root.gameObject.activeSelf) continue;
                 nearest = Mathf.Min(nearest, bounds.min.z);
                 farthest = Mathf.Max(farthest, bounds.max.z);
                 if (model.plinth != null)
@@ -631,6 +702,9 @@ namespace HeadTracked.Demo
             floorScale.x = roomWidth;
             floorScale.z = back - front;
             roomFloor.localScale = floorScale;
+            var floorMaterial = roomFloor.GetComponent<Renderer>().sharedMaterial;
+            foreach (string map in new[] { "_BaseMap", "_BumpMap", "_MetallicGlossMap", "_OcclusionMap" })
+                if (floorMaterial.HasProperty(map)) floorMaterial.SetTextureScale(map, new Vector2(floorScale.x / .8f, floorScale.z / .8f));
         }
 
         private void LoadModelLayout()
@@ -657,6 +731,7 @@ namespace HeadTracked.Demo
                 ApplyModelLayout();
                 SetPlantIsolation(saved.isolatePlant);
                 if (saved.depthComparison) SetDepthComparisonVisibility();
+                if (saved.materialStudy) UseMaterialStudy();
             }
             catch (Exception ex) { notice = "Could not load model layout: " + ex.Message; }
         }
@@ -718,6 +793,26 @@ namespace HeadTracked.Demo
             }
         }
 
+        private void LoadHardwareScreenHint()
+        {
+            string path = Path.Combine(Application.persistentDataPath, "monitor_hint.json");
+            if (!File.Exists(path)) return;
+            try
+            {
+                var hint = JsonUtility.FromJson<MonitorHint>(File.ReadAllText(path));
+                if (hint.widthCm < 10 || hint.widthCm > 200 || hint.heightCm < 10 || hint.heightCm > 150) return;
+                reportedScreenWidth = hint.widthCm; reportedScreenHeight = hint.heightCm;
+                var c = display.Calibration;
+                if (Mathf.Abs(c.screenWidth - .53f) < .0001f && Mathf.Abs(c.screenHeight - .30f) < .0001f)
+                {
+                    c.screenWidth = reportedScreenWidth * .01f;
+                    c.deriveScreenHeightFromResolution = true;
+                }
+                Debug.Log($"Panel hint: {reportedScreenWidth:F0} x {reportedScreenHeight:F0} cm (rounded). Using width {c.screenWidth * 100f:F1} cm; derive height {c.deriveScreenHeightFromResolution}.");
+            }
+            catch (Exception ex) { Debug.LogWarning("Panel hint unavailable: " + ex.Message); }
+        }
+
         private void SaveSettings()
         {
             try
@@ -725,7 +820,7 @@ namespace HeadTracked.Demo
                 var path = Path.Combine(Application.persistentDataPath, "display_calibration.json");
                 File.WriteAllText(path, JsonUtility.ToJson(display.Calibration, true));
                 var layout = new ModelLayoutFile { models = new ModelSizeAndDepth[sceneModels.Count], isolatePlant = isolatePlant,
-                    depthComparison = depthComparisonActive };
+                    depthComparison = depthComparisonActive, materialStudy = materialStudyActive };
                 for (int i = 0; i < sceneModels.Count; i++)
                     layout.models[i] = new ModelSizeAndDepth { height = sceneModels[i].height, depth = sceneModels[i].depth,
                         x = sceneModels[i].x, y = sceneModels[i].supportY + sceneModels[i].height * .5f, hasPosition = true };
@@ -770,6 +865,8 @@ namespace HeadTracked.Demo
             for (int i = 0; i <= 10; i++)
                 GUI.DrawTexture(new Rect(left + pixels * i / 10f, y - 5f, 2f, 12f), Texture2D.whiteTexture);
             GUI.Box(new Rect(left, y - 30f, pixels, 24f), "10 cm on the physical screen");
+            float verticalPixels = Screen.height * .10f / display.Calibration.screenHeight;
+            GUI.Box(new Rect(Screen.width - 36, (Screen.height - verticalPixels) * .5f, 24, verticalPixels), "10\ncm");
         }
 
         private void DrawModelSettings()
@@ -787,7 +884,7 @@ namespace HeadTracked.Demo
             GUILayout.EndHorizontal();
             bool isolate = GUILayout.Toggle(isolatePlant, "Only green plant / hide room and supports");
             if (isolate != isolatePlant) SetPlantIsolation(isolate);
-            if (GUILayout.Button("Restore all six models and original positions")) ResetModelLayout();
+            if (GUILayout.Button("Restore all models and original positions")) ResetModelLayout();
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Shallow desktop")) UseDepthPreset(false);
             if (GUILayout.Button("Depth stress test")) UseDepthPreset(true);
@@ -833,6 +930,7 @@ namespace HeadTracked.Demo
         private void OnGUI()
         {
             if (display == null) return;
+            if (cleanView) return;
             if (calibratingGaze) { DrawGazeCalibration(); return; }
             if (showGazePoint && gazeAvailable && display.IsTracking && display.LatestObservation.gazeValid)
                 GUI.Box(new Rect(Mathf.Clamp01(gazePoint.x) * Screen.width - 8,
@@ -848,6 +946,15 @@ namespace HeadTracked.Demo
             GUILayout.Label($"Tracking: {(display.IsTracking ? "FACE FOUND" : "NO FACE")} | {display.SourceStatus}");
             GUILayout.Label($"Eye (m): {display.EyePositionMeters.ToString("F3")}  Confidence: {display.Confidence:F2}");
             GUILayout.Label($"Display: {Screen.width} x {Screen.height} px");
+            if (GUILayout.Button("Realistic material comparison")) UseMaterialStudy();
+            bool quality = GUILayout.Toggle(enhancedRendering, "Enhanced rendering: 4x MSAA / soft shadows / SSAO");
+            if (quality != enhancedRendering)
+            {
+                enhancedRendering = quality;
+                if (renderQuality != null) renderQuality.Apply(quality);
+            }
+            GUILayout.Label("F1 hides all panels for judging the surfaces.");
+            if (materialStudyActive) GUILayout.Label("40 cm ceramic vase, wood surface, brass and steel spheres.");
             var c = display.Calibration;
             float physicalAspect = c.screenWidth / c.screenHeight;
             float imageAspect = (float)Screen.width / Screen.height;
@@ -861,7 +968,26 @@ namespace HeadTracked.Demo
             showTrackingTest = GUILayout.Toggle(showTrackingTest, "Show eye / head / gaze test panel");
             c.useRigidFacePose = GUILayout.Toggle(c.useRigidFacePose, "Use rigid face pose (Python; disable for legacy A/B)");
             c.screenWidth = Mathf.Max(0.1f, Input("Screen width (cm)", widthCm, out widthCm, 0.01f, c.screenWidth));
+            c.deriveScreenHeightFromResolution = GUILayout.Toggle(c.deriveScreenHeightFromResolution,
+                "Full-screen square pixels: derive height from measured width");
+            bool heightEnabled = GUI.enabled;
+            if (c.deriveScreenHeightFromResolution)
+            {
+                heightCm = (c.screenHeight * 100f).ToString("F2");
+                GUI.enabled = false;
+            }
             c.screenHeight = Mathf.Max(0.1f, Input("Screen height (cm)", heightCm, out heightCm, 0.01f, c.screenHeight));
+            GUI.enabled = heightEnabled;
+            GUILayout.Label("Measure the visible panel width. Derived height is not a hardware measurement.");
+            if (reportedScreenWidth > 0)
+            {
+                GUILayout.Label($"Panel reports about {reportedScreenWidth:F0} x {reportedScreenHeight:F0} cm (rounded estimate). Verify both 10 cm rulers.");
+                if (GUILayout.Button("Use reported panel width (estimate)"))
+                {
+                    c.screenWidth = reportedScreenWidth * .01f; widthCm = reportedScreenWidth.ToString("F1");
+                    c.deriveScreenHeightFromResolution = true;
+                }
+            }
             c.referenceEyeDistanceFromScreen = Mathf.Max(0.2f,
                 Input("Reference eye distance (cm)", eyeDistanceCm, out eyeDistanceCm, 0.01f, c.referenceEyeDistanceFromScreen));
             var webcam = c.webcamPosition;
@@ -955,11 +1081,15 @@ namespace HeadTracked.Demo
         }
 
         [Serializable]
+        private sealed class MonitorHint { public float widthCm, heightCm; }
+
+        [Serializable]
         private sealed class ModelLayoutFile
         {
             public ModelSizeAndDepth[] models;
             public bool isolatePlant;
             public bool depthComparison;
+            public bool materialStudy;
         }
 
         [Serializable]

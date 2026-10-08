@@ -1,6 +1,6 @@
 {
   "name": "HeadTracked.Demo",
   "rootNamespace": "HeadTracked.Demo",
-  "references": ["HeadTracked.Display"],
+  "references": ["HeadTracked.Display", "Unity.RenderPipelines.Core.Runtime", "Unity.RenderPipelines.Universal.Runtime"],
   "autoReferenced": true
 }

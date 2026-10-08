@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d31358dc1f69114897c85eb98f63941, type: 3}
+  m_Name: render_quality
+  m_EditorClassIdentifier: HeadTracked.Demo::HeadTracked.Demo.RenderQualitySettings
+  pipeline: {fileID: 11400000, guid: cbddc96c2780a6048ae22599a7a7f47f, type: 2}
+  renderer: {fileID: 11400000, guid: 34944bb49e2df334587245b9db65f654, type: 2}
+  ambientCoefficients:
+  - 0.43726322
+  - 0.0352131
+  - 0.09922801
+  - -0.047277164
+  - 0.090878785
+  - 0.055679154
+  - 0.025501648
+  - 0.07794088
+  - 0.025593704
+  - 0.4261333
+  - 0.035444852
+  - 0.11030078
+  - -0.047393665
+  - 0.0873337
+  - 0.06073549
+  - 0.025024863
+  - 0.08735551
+  - 0.025590291
+  - 0.42711738
+  - 0.0381254
+  - 0.12001617
+  - -0.044890095
+  - 0.08798297
+  - 0.06671686
+  - 0.025364177
+  - 0.10036447
+  - 0.026228508

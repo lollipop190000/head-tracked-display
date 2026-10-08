@@ -1,5 +1,7 @@
 # Third-party components
 
+- `Demo/Assets/Resources/Realism` uses [Poly Haven Ceramic Vase 01](https://polyhaven.com/a/ceramic_vase_01) by James Ray Cock, [Wood Floor Deck](https://polyhaven.com/a/wood_floor_deck), and [Studio Small 09](https://polyhaven.com/a/studio_small_09), all [CC0 1.0](https://polyhaven.com/license). `sources.json` records upstream files and SHA-256 hashes. Metallic/smoothness maps and ambient probe coefficients are derived for Unity by the included tools.
+
 - Demo FBX files (`bear.fbx`, `chairDesk.fbx`, `pottedPlant.fbx`) come from [Kenney Furniture Kit](https://kenney.nl/assets/furniture-kit), Creative Commons CC0 1.0. The downloaded pack's `License.txt` explicitly states CC0. These assets are examples only and are not required by the package.
 - [MediaPipe Unity Plugin v0.16.3](https://github.com/homuler/MediaPipeUnityPlugin/releases/tag/v0.16.3) is an optional dependency. Its repository is MIT licensed, with bundled components covered by its own Third Party Notices. The installer downloads the release archive into an ignored local file.
 - [MediaPipe Python](https://pypi.org/project/mediapipe/) is installed in a local virtual environment. Review its package terms and privacy disclosures before redistributing a product that uses it.

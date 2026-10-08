@@ -3,6 +3,7 @@ param(
     [int]$Camera = 0,
     [switch]$TrackingTest,
     [switch]$DepthTest,
+    [switch]$RealismTest,
     [switch]$Stop
 )
 
@@ -29,6 +30,22 @@ function Stop-ProjectTrackers {
     foreach ($process in $owned) {
         Stop-Process -Id $process.ProcessId -ErrorAction SilentlyContinue
     }
+}
+
+function Update-PanelHint {
+    # EDID dimensions are rounded centimetres: a hint for old demo defaults, not a measurement.
+    $monitorHint = Join-Path (Split-Path -Parent $calibrationFile) 'monitor_hint.json'
+    try {
+        $monitors = @(Get-CimInstance -Namespace root/wmi -ClassName WmiMonitorBasicDisplayParams |
+            Where-Object { $_.Active -and $_.MaxHorizontalImageSize -gt 10 -and $_.MaxVerticalImageSize -gt 10 })
+        if ($monitors.Count -eq 1) {
+            New-Item -ItemType Directory -Path (Split-Path -Parent $monitorHint) -Force | Out-Null
+            @{ widthCm = [int]$monitors[0].MaxHorizontalImageSize; heightCm = [int]$monitors[0].MaxVerticalImageSize } |
+                ConvertTo-Json | Set-Content -LiteralPath $monitorHint -Encoding UTF8
+        }
+        else { Remove-Item -LiteralPath $monitorHint -ErrorAction SilentlyContinue }
+    }
+    catch { Write-Warning 'Panel dimensions could not be read; measure the screen width manually.' }
 }
 
 $players = @(Get-CimInstance Win32_Process -Filter "Name = 'HeadTrackedDemo.exe'" |
@@ -64,11 +81,12 @@ try {
         }
     }
     Stop-ProjectTrackers
+    Update-PanelHint
     $lifetimeFile = Join-Path (Split-Path -Parent $gameExe) ('tracker-session-' + [guid]::NewGuid().ToString('N') + '.heartbeat')
     [System.IO.File]::WriteAllText($lifetimeFile, '')
 
     Write-Host "Starting Unity demo and webcam $Camera. Close the game with Alt+F4."
-    $gameArguments = if ($DepthTest) { @('--depth-test') } elseif ($TrackingTest) { @('--tracking-test') } else { @() }
+    $gameArguments = if ($RealismTest) { @('--realism-test') } elseif ($DepthTest) { @('--depth-test') } elseif ($TrackingTest) { @('--tracking-test') } else { @() }
     $startGame = @{
         FilePath = $gameExe; WorkingDirectory = (Split-Path -Parent $gameExe)
         WindowStyle = 'Normal'; PassThru = $true

@@ -9,6 +9,8 @@ namespace HeadTracked.Display
         [Header("Physical display, metres")]
         [Min(0.1f)] public float screenWidth = 0.53f;
         [Min(0.1f)] public float screenHeight = 0.30f;
+        [Tooltip("For a full-screen square-pixel monitor, derive height from measured width and render resolution.")]
+        public bool deriveScreenHeightFromResolution;
         [Tooltip("Webcam lens relative to the screen centre. Negative Z is in front of the screen.")]
         public Vector3 webcamPosition = new Vector3(0f, 0.17f, -0.025f);
         [Tooltip("Rotation of the webcam's outward optical axis relative to the screen. Usually X is negative if it tilts down.")]

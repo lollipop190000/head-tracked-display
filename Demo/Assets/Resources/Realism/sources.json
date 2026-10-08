@@ -1,0 +1,79 @@
+[
+  {
+    "file": "ceramic_vase.fbx",
+    "asset": "ceramic_vase_01",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Models/fbx/1k/ceramic_vase_01/ceramic_vase_01_1k.fbx",
+    "sha256": "e55748bc144a1a1412d146ea3727a0afe3a9df513477fc07f56d662e08146d1d",
+    "license": "CC0-1.0"
+  },
+  {
+    "file": "vase_albedo.png",
+    "asset": "ceramic_vase_01",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/ceramic_vase_01/ceramic_vase_01_diff_2k.png",
+    "sha256": "3899db518d4bdb8761b257b4042e498dd54bb993bedfd8efafc7b514ae0fbac3",
+    "license": "CC0-1.0"
+  },
+  {
+    "file": "vase_normal.png",
+    "asset": "ceramic_vase_01",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/ceramic_vase_01/ceramic_vase_01_nor_gl_2k.png",
+    "sha256": "09851686685eb09952c371faa3ae987df5ecea7dfc9749c6912f611eddc15a8b",
+    "license": "CC0-1.0"
+  },
+  {
+    "file": "vase_rough.png",
+    "asset": "ceramic_vase_01",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/ceramic_vase_01/ceramic_vase_01_rough_2k.png",
+    "sha256": "87a1a7a4b5607ea813f7bfa9a226ee2ce637472da24ec7d01bf230e84dabf9cf",
+    "license": "CC0-1.0"
+  },
+  {
+    "file": "vase_metal.png",
+    "asset": "ceramic_vase_01",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/ceramic_vase_01/ceramic_vase_01_metal_2k.png",
+    "sha256": "8cfdfd359a8b276365038051e0b1d4910d60ffc83f35df8fdb8acbb49247e879",
+    "license": "CC0-1.0"
+  },
+  {
+    "file": "vase_ao.png",
+    "asset": "ceramic_vase_01",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Models/png/2k/ceramic_vase_01/ceramic_vase_01_ao_2k.png",
+    "sha256": "bc0fc9fe1951d9ec5412627c90af9788fd7f21201db29d869ee5d58a1fc52965",
+    "license": "CC0-1.0"
+  },
+  {
+    "file": "wood_albedo.png",
+    "asset": "wood_floor_deck",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/wood_floor_deck/wood_floor_deck_diff_1k.png",
+    "sha256": "a96393b4b44da28b63dae80f8ce4cdc357a85e0127fc842b557c82ccfeca2f88",
+    "license": "CC0-1.0"
+  },
+  {
+    "file": "wood_normal.png",
+    "asset": "wood_floor_deck",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/wood_floor_deck/wood_floor_deck_nor_gl_1k.png",
+    "sha256": "cf1f1629935d5decccfe66a771e8c6cc84f3ffd7157c60580322b4600441d75b",
+    "license": "CC0-1.0"
+  },
+  {
+    "file": "wood_rough.png",
+    "asset": "wood_floor_deck",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/wood_floor_deck/wood_floor_deck_rough_1k.png",
+    "sha256": "e9be19ea33ccbf2c935b6c74e34ff179d89a89b532ba87a3a17ee3af0b6479ad",
+    "license": "CC0-1.0"
+  },
+  {
+    "file": "wood_ao.png",
+    "asset": "wood_floor_deck",
+    "source": "https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/wood_floor_deck/wood_floor_deck_ao_1k.png",
+    "sha256": "1713778acc4eecc31b63354af981a6d7466d2736c240c25dd7c1a5a42220c6d2",
+    "license": "CC0-1.0"
+  },
+  {
+    "file": "studio.hdr",
+    "asset": "studio_small_09",
+    "source": "https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/studio_small_09_1k.hdr",
+    "sha256": "e7cfda5f4e98e623db12b8bfd0184e048488e4855d9c83e2751fb44a32e80c45",
+    "license": "CC0-1.0"
+  }
+]

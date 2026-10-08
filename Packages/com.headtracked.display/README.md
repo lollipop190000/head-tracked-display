@@ -2,6 +2,8 @@
 
 Single viewer, physical monitor off-axis projection for Unity 6.3 or newer. The package moves one Unity camera and updates its asymmetric projection from an interchangeable eye observation source. Models and their materials require no tracking code.
 
+`DisplayCalibration.deriveScreenHeightFromResolution` optionally derives physical height from measured width and camera pixel aspect. It defaults to false in the package. Use it only for a camera covering a full square-pixel panel; verify physical rulers on both axes. It does not recover unknown absolute monitor size.
+
 ## Install
 
 In Unity Package Manager, select **Add package from disk** and choose this folder's `package.json`. For a Git installation, use the repository URL with `?path=/Packages/com.headtracked.display`. The package provides the Python TCP bridge without other third-party Unity packages. The optional Unity-native provider activates after installing MediaPipe Unity Plugin v0.16.3 or a compatible later version; use `tools/setup_native_plugin.py` from the repository root to set up the demo.
