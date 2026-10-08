@@ -200,5 +200,94 @@ namespace HeadTracked.Display.Tests
                 eyeSpanForeshortening = foreshortening
             };
         }
+
+        [TestCase(350f, 1)]
+        [TestCase(900f, 1)]
+        [TestCase(600f, 2)]
+        public void ReferenceEyeSpacingRecoversMetricTravelAcrossWebcamFovsAndResolutions(float focal, int frameScale)
+        {
+            var calibration = new DisplayCalibration
+            {
+                webcamPosition = Vector3.zero,
+                referenceEyeDistanceFromScreen = .6f,
+                measuredEyeSeparationMeters = .063f,
+                horizontalFovDegrees = 60f,
+                mirrorImageX = false
+            };
+            Assert.That(calibration.CaptureReference(SyntheticObservation(focal, 640, 480,
+                new Vector3(0f, 0f, -.6f))), Is.True);
+            var actualEye = new Vector3(.1f, .04f, -.4f);
+            var moved = SyntheticObservation(focal * frameScale, 640 * frameScale, 480 * frameScale, actualEye);
+            Assert.That(EyePoseEstimator.TryEstimate(moved, calibration, out Vector3 recovered), Is.True);
+            Assert.That(Vector3.Distance(recovered, actualEye), Is.LessThan(1e-4f));
+        }
+
+        [Test]
+        public void EyeSpacingScaleSeparatesLateralTravelFromAnIncorrectReferenceDistance()
+        {
+            var calibration = new DisplayCalibration
+            {
+                webcamPosition = Vector3.zero,
+                referenceEyeDistanceFromScreen = .5f,
+                mirrorImageX = false
+            };
+            calibration.CaptureReference(SyntheticObservation(500f, 640, 480, new Vector3(0f, 0f, -.7f)));
+            var moved = SyntheticObservation(500f, 640, 480, new Vector3(.1f, .03f, -.7f));
+            Assert.That(EyePoseEstimator.TryEstimate(moved, calibration, out Vector3 recovered), Is.True);
+            Assert.That(recovered.x, Is.EqualTo(.1f).Within(1e-4f));
+            Assert.That(recovered.y, Is.EqualTo(.03f).Within(1e-4f));
+            // Monocular basic calibration still needs a physically measured reference distance for Z.
+            Assert.That(recovered.z, Is.EqualTo(-.5f).Within(1e-4f));
+        }
+
+        [Test]
+        public void ReferenceCaptureAccountsForWebcamTiltAndOffset()
+        {
+            var calibration = new DisplayCalibration
+            {
+                webcamPosition = new Vector3(.03f, .17f, -.025f),
+                webcamEulerDegrees = new Vector3(-15f, 0f, 0f),
+                referenceEyeDistanceFromScreen = .6f,
+                mirrorImageX = false
+            };
+            Quaternion inverse = Quaternion.Inverse(Quaternion.Euler(calibration.webcamEulerDegrees));
+            Vector3 reference = new Vector3(0f, 0f, -.6f);
+            calibration.CaptureReference(SyntheticObservation(600f, 640, 480,
+                inverse * (reference - calibration.webcamPosition)));
+            Vector3 actualEye = new Vector3(.1f, .03f, -.45f);
+            var observation = SyntheticObservation(600f, 640, 480,
+                inverse * (actualEye - calibration.webcamPosition));
+            Assert.That(EyePoseEstimator.TryEstimate(observation, calibration, out Vector3 recovered), Is.True);
+            Assert.That(Vector3.Distance(recovered, actualEye), Is.LessThan(1e-4f));
+        }
+
+        [Test]
+        public void RelativeParallaxDependsOnPhysicalObjectSizeAndDepth()
+        {
+            const float d = .6f, z = .42f, height = .22f, headMove = .1f;
+            var neutral = new Vector3(0f, 0f, -d);
+            var moved = new Vector3(headMove, 0f, -d);
+            Matrix4x4 baselineProjection = OffAxisProjection.Calculate(neutral, .53f, .3f, .025f, 10f);
+            Matrix4x4 movedProjection = OffAxisProjection.Calculate(moved, .53f, .3f, .025f, 10f);
+            float shiftMetres = (ScreenPoint(movedProjection, moved, new Vector3(0f, 0f, z)).x -
+                ScreenPoint(baselineProjection, neutral, new Vector3(0f, 0f, z)).x) * .53f * .5f;
+            float heightMetres = (ScreenPoint(baselineProjection, neutral, new Vector3(0f, height * .5f, z)).y -
+                ScreenPoint(baselineProjection, neutral, new Vector3(0f, -height * .5f, z)).y) * .3f * .5f;
+            Assert.That(shiftMetres / heightMetres, Is.EqualTo(z * headMove / (d * height)).Within(1e-5f));
+        }
+
+        private static HeadObservation SyntheticObservation(float focal, int width, int height, Vector3 eye)
+        {
+            const float ipd = .063f;
+            float distance = -eye.z;
+            float leftX = .5f + focal * (eye.x - ipd * .5f) / (distance * width);
+            float rightX = .5f + focal * (eye.x + ipd * .5f) / (distance * width);
+            float y = .5f - focal * eye.y / (distance * height);
+            return new HeadObservation
+            {
+                found = true, confidence = 1f, frameWidth = width, frameHeight = height,
+                leftEye = new Vector2(leftX, y), rightEye = new Vector2(rightX, y), eyeSpanForeshortening = 1f
+            };
+        }
     }
 }

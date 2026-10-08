@@ -11,13 +11,33 @@ namespace HeadTracked.Demo.Tests
     public sealed class SceneSmokeTests
     {
         [UnityTest]
+        public IEnumerator DepthPresetsChangePlacementWithoutResizingOrRotatingModels()
+        {
+            yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
+            yield return null;
+            var model = GameObject.Find("Plant, in front of screen").transform;
+            var renderer = model.GetComponentInChildren<Renderer>();
+            Vector3 scale = model.localScale;
+            Quaternion rotation = model.rotation;
+            float height = renderer.bounds.size.y;
+            var demo = Object.FindFirstObjectByType<DemoBootstrap>();
+            demo.UseDepthPreset(true);
+            Assert.That(renderer.bounds.center.z, Is.EqualTo(-.18f).Within(.001f));
+            Assert.That(renderer.bounds.size.y, Is.EqualTo(height).Within(.001f));
+            Assert.That(Vector3.Distance(model.localScale, scale), Is.LessThan(.001f));
+            Assert.That(Quaternion.Angle(model.rotation, rotation), Is.LessThan(.001f));
+            demo.UseDepthPreset(false);
+            Assert.That(renderer.bounds.center.z, Is.EqualTo(-.06f).Within(.001f));
+        }
+
+        [UnityTest]
         public IEnumerator ModelsRenderOnBothSidesOfThePhysicalScreen()
         {
             yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
             yield return null;
 
             var front = GameObject.Find("Bear, in front of screen");
-            var protruding = GameObject.Find("Plant, 18 cm in front of screen");
+            var protruding = GameObject.Find("Plant, in front of screen");
             var chair = GameObject.Find("Chair, behind screen");
             var plant = GameObject.Find("Plant, behind chair");
             Assert.That(front, Is.Not.Null);
@@ -29,7 +49,7 @@ namespace HeadTracked.Demo.Tests
             Assert.That(chair.GetComponentInChildren<MeshFilter>(), Is.Not.Null);
             Assert.That(plant.GetComponentInChildren<MeshFilter>(), Is.Not.Null);
             Assert.That(front.GetComponentInChildren<Renderer>().bounds.center.z, Is.LessThan(0f));
-            Assert.That(protruding.GetComponentInChildren<Renderer>().bounds.center.z, Is.LessThan(-0.1f));
+            Assert.That(protruding.GetComponentInChildren<Renderer>().bounds.center.z, Is.EqualTo(-.06f).Within(.001f));
             Assert.That(chair.GetComponentInChildren<Renderer>().bounds.center.z, Is.GreaterThan(0f));
             Assert.That(plant.GetComponentInChildren<Renderer>().bounds.center.z, Is.GreaterThan(0f));
             Assert.That(front.GetComponentInChildren<HeadTrackedDisplay>(), Is.Null);

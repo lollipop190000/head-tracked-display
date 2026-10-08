@@ -1,0 +1,6 @@
+{
+  "name": "HeadTracked.Demo",
+  "rootNamespace": "HeadTracked.Demo",
+  "references": ["HeadTracked.Display"],
+  "autoReferenced": true
+}

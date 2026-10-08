@@ -16,9 +16,18 @@ namespace HeadTracked.Display
                 ? width / calibration.intrinsicsImageWidth : 1f;
             float intrinsicsScaleY = calibration.intrinsicsImageHeight > 0
                 ? height / calibration.intrinsicsImageHeight : 1f;
+            float referenceSpan = calibration.referenceFrameWidth > 0
+                ? calibration.referenceEyeSpanPixels * width / calibration.referenceFrameWidth : 0f;
+            float basicFocal = width / (2f * Mathf.Tan(calibration.horizontalFovDegrees * Mathf.Deg2Rad * 0.5f));
+            float referenceCameraDepth = ReferenceCameraDepth(calibration, referenceSpan, width, height, basicFocal);
+            if (calibration.useEyeSeparationForBasicScale && referenceSpan > 1f &&
+                calibration.measuredEyeSeparationMeters > 0f)
+            {
+                basicFocal = referenceSpan * referenceCameraDepth / calibration.measuredEyeSeparationMeters;
+            }
             float fx = calibration.usePreciseIntrinsics && calibration.focalXPixels > 1f
                 ? calibration.focalXPixels * intrinsicsScaleX
-                : width / (2f * Mathf.Tan(calibration.horizontalFovDegrees * Mathf.Deg2Rad * 0.5f));
+                : basicFocal;
             float fy = calibration.usePreciseIntrinsics && calibration.focalYPixels > 1f
                 ? calibration.focalYPixels * intrinsicsScaleY : fx;
             float cx = calibration.usePreciseIntrinsics && calibration.focalXPixels > 1f
@@ -50,9 +59,7 @@ namespace HeadTracked.Display
             }
             else if (calibration.referenceEyeSpanPixels > 1f && calibration.referenceFrameWidth > 0)
             {
-                float referenceSpan = calibration.referenceEyeSpanPixels * width / calibration.referenceFrameWidth;
-                cameraToEye = (calibration.referenceEyeDistanceFromScreen + calibration.webcamPosition.z) *
-                              referenceSpan * foreshortening / spanPixels;
+                cameraToEye = referenceCameraDepth * referenceSpan * foreshortening / spanPixels;
             }
             else
             {
@@ -68,6 +75,31 @@ namespace HeadTracked.Display
                 Mathf.Max(calibration.minimumEyeDistanceFromScreen, calibration.maximumEyeDistanceFromScreen));
             eye = new Vector3(local.x, local.y, -distance);
             return true;
+        }
+
+        private static float ReferenceCameraDepth(DisplayCalibration c, float referenceSpan,
+            float width, float height, float assumedFocal)
+        {
+            float fallback = c.referenceEyeDistanceFromScreen + c.webcamPosition.z;
+            if (!c.hasReferenceEyeMidpoint || referenceSpan <= 1f) return fallback;
+            float xPixels = (c.referenceEyeMidpoint.x - .5f) * width;
+            if (c.mirrorImageX) xPixels = -xPixels;
+            float yPixels = - (c.referenceEyeMidpoint.y - .5f) * height;
+            Quaternion rotation = Quaternion.Euler(c.webcamEulerDegrees);
+            if (c.useEyeSeparationForBasicScale && c.measuredEyeSeparationMeters > 0f)
+            {
+                Vector3 transverse = new Vector3(xPixels, yPixels, 0f) *
+                    (c.measuredEyeSeparationMeters / referenceSpan);
+                float opticalZ = (rotation * Vector3.forward).z;
+                if (opticalZ > .1f)
+                    return (fallback + (rotation * transverse).z) / opticalZ;
+            }
+            else
+            {
+                Vector3 ray = rotation * new Vector3(xPixels / assumedFocal, yPixels / assumedFocal, -1f);
+                if (ray.z < -.1f) return -fallback / ray.z;
+            }
+            return fallback;
         }
 
         private static Vector2 Undistort(float x, float y, DisplayCalibration c)

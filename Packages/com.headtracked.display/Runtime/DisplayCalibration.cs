@@ -18,10 +18,14 @@ namespace HeadTracked.Display
 
         [Header("Basic distance calibration")]
         [Range(30f, 110f)] public float horizontalFovDegrees = 60f;
+        [Tooltip("After reference capture, estimate basic camera scale from the measured eye separation instead of an assumed webcam FOV.")]
+        public bool useEyeSeparationForBasicScale = true;
         [Min(0.2f)] public float referenceEyeDistanceFromScreen = 0.60f;
         [Tooltip("Captured eye separation in pixels at the reference position. Zero means fixed distance until capture.")]
         public float referenceEyeSpanPixels;
         public int referenceFrameWidth;
+        public Vector2 referenceEyeMidpoint;
+        public bool hasReferenceEyeMidpoint;
 
         [Header("Precision calibration")]
         public bool usePreciseIntrinsics;
@@ -49,6 +53,8 @@ namespace HeadTracked.Display
             referenceEyeSpanPixels = new Vector2(delta.x * observation.frameWidth,
                 delta.y * observation.frameHeight).magnitude / observation.EyeSpanForeshortening;
             referenceFrameWidth = observation.frameWidth;
+            referenceEyeMidpoint = (observation.leftEye + observation.rightEye) * .5f;
+            hasReferenceEyeMidpoint = true;
             return referenceEyeSpanPixels > 1f;
         }
     }

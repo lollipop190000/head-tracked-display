@@ -21,6 +21,13 @@ namespace HeadTracked.Display
 
         public DisplayCalibration Calibration => calibration;
         public Vector3 EyePositionMeters => currentEye;
+        public Vector3 EstimatedEyePositionMeters { get; private set; }
+        public bool FreezeViewingDistance { get; set; }
+        public float TrackingSmoothingSeconds
+        {
+            get => trackingSmoothingSeconds;
+            set => trackingSmoothingSeconds = Mathf.Clamp(value, .005f, .3f);
+        }
         public bool IsTracking { get; private set; }
         public float Confidence { get; private set; }
         public string SourceStatus => observationSource != null ? observationSource.Status : "No tracking source";
@@ -57,6 +64,8 @@ namespace HeadTracked.Display
             if (valid) hasLatest = true;
             IsTracking = valid;
             Confidence = valid ? latest.confidence : 0f;
+            if (valid && FreezeViewingDistance) estimated.z = NeutralEye.z;
+            EstimatedEyePositionMeters = estimated;
             Vector3 target = valid ? estimated : NeutralEye;
             float timeConstant = valid ? trackingSmoothingSeconds : returnToNeutralSeconds;
             float alpha = 1f - Mathf.Exp(-Time.unscaledDeltaTime / Mathf.Max(0.001f, timeConstant));

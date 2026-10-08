@@ -25,7 +25,7 @@ Double-click [`Run-HeadTrackedDemo.cmd`](Run-HeadTrackedDemo.cmd). It starts the
 
 The Windows player lives at `Builds/HeadTrackedDemo/HeadTrackedDemo.exe` in the prepared checkout. Build output, the Python environment, and the Face Landmarker model are deliberately excluded from Git; a new clone needs the setup below.
 
-In the demo, wait for **Tracking: FACE FOUND**. Move your head left/right, up/down, and toward/away from the monitor. The red plant is 18 cm in front of the screen plane; it should shift in the opposite direction from the chair and green plant behind the screen. If it stays at **NO FACE**, check the webcam number, lighting, and camera permission. Enter the physical display measurements and capture a reference distance before judging the geometry.
+In the demo, wait for **Tracking: FACE FOUND**. Move your head left/right, up/down, and toward/away from the monitor. The default shallow layout places the red plant 6 cm in front of the screen plane; it should shift in the opposite direction from the chair and green plant behind the screen. Open **Model size and depth** to adjust real model heights and centre depths, or select **Depth stress test** for the earlier 18 cm protrusion. If it stays at **NO FACE**, check the webcam number, lighting, and camera permission. Enter the physical display measurements and capture a reference distance before judging the geometry.
 
 ### Build and run from source
 
@@ -76,7 +76,9 @@ Both backends request MediaPipe's facial transformation matrix. Its horizontal a
 
 Measure the visible screen width and height, the webcam lens position relative to the screen center, and your eye distance from the screen. Enter them in the demo settings. The initial 53 × 30 cm screen, webcam 17 cm above and 2.5 cm in front of the screen, and 60 cm eye distance are examples, **not measurements of your hardware**.
 
-Sit at the entered distance while your face is visible and press **Capture reference distance**, then **Save calibration**. Use **Mirror webcam X** if left/right motion appears reversed; use **Webcam pitch** if the lens points up or down. Run full screen and keep the measured screen aspect ratio close to the rendered aspect ratio. The settings panel reports an aspect mismatch and shows the current eye position, source status, and tracking state.
+Sit at the entered distance while your face is visible and press **Capture reference distance**, then **Save calibration**. Enter measured **Eye separation / IPD** and leave **Use eye spacing for basic movement scale** enabled: reference eye spacing now calibrates basic lateral/vertical scale instead of using the assumed 60-degree webcam FOV. This is approximate; the entered viewing distance and eye separation still need physical measurement. Use **Mirror webcam X** if left/right motion appears reversed; use **Webcam pitch** if the lens points up or down. Run full screen and keep the measured screen aspect ratio close to the rendered aspect ratio.
+
+If the scene seems to move too much, check the **10 cm screen ruler**, then use **Set movement measurement origin** to compare a measured head translation with the reported X/Y/Z travel. The demo also provides a diagnostic distance freeze and adjustable tracking smoothing. See [physical scale and apparent motion](docs/physical-scale.md) for the geometry, calibration sequence, model-size controls, and what the perception papers support.
 
 ### Camera intrinsics (optional)
 
@@ -114,7 +116,7 @@ Game code can read `EyePositionMeters`, `IsTracking`, `Confidence`, and `SourceS
 
 ## Validation and limitations
 
-The automated suite checks screen corners, physical eye-to-object sightlines at multiple depths, Unity's actual camera viewport projection, parallax direction and scale, and yaw-compensated distance in basic and precise modes. The latest run passed **16/16 Unity EditMode** and **1/1 Unity PlayMode** tests in the core demo. A prior run with the optional Unity MediaPipe plugin installed passed **2/2 PlayMode** tests, and the Python protocol suite passed **3/3** tests. Run them with Unity Test Runner's EditMode and PlayMode tabs, and run the Python tests with:
+The automated suite checks screen corners, physical eye-to-object sightlines at multiple depths, Unity's actual camera viewport projection, parallax direction and scale, yaw-compensated distance, webcam tilt/offset, and metric translation across simulated webcam FOVs and resolutions. The current core run passed **22/22 EditMode** and **2/2 PlayMode** tests. Scene tests also check that depth presets preserve model dimensions and orientation. A prior run with the optional Unity MediaPipe plugin installed passed its native webcam test, and the Python protocol suite passed **3/3** tests. Run the Unity tests with Test Runner's EditMode and PlayMode tabs, and run the Python tests with:
 
 ```powershell
 ./python_tracker/.venv/Scripts/python.exe -m unittest discover -s python_tracker -p 'test_*.py' -v
