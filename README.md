@@ -4,7 +4,7 @@
 
 Head Tracked Display makes an ordinary monitor behave like a window into a fixed 3D scene. A webcam estimates one viewer's eye position. Unity moves the render camera to that position and updates an **off-axis perspective projection** for the measured screen. Put any ordinary 3D model behind or in front of the screen plane; no script or head-driven rotation is added to the model.
 
-![The Unity URP demo at the neutral viewpoint: a bear and a red plant in front of the screen plane, with a chair and green plant behind it](docs/demo-neutral.png)
+![The Unity URP demo: near models and a distant purple chair and blue plant behind the screen](docs/demo-neutral.png)
 
 This is a **single-viewer, monoscopic** display. It provides motion parallax, not separate images for the left and right eyes.
 
@@ -13,7 +13,7 @@ This is a **single-viewer, monoscopic** display. It provides motion parallax, no
 | Path | Purpose |
 | --- | --- |
 | [`Packages/com.headtracked.display`](Packages/com.headtracked.display) | Reusable Unity Package Manager package: projection, calibration, eye pose, tracker interface, and optional tracking sources. |
-| [`Demo`](Demo) | Unity 6.3 LTS URP project with four real FBX model instances at different physical depths. |
+| [`Demo`](Demo) | Unity 6.3 LTS URP project with six real FBX model instances, including objects 3 m and 6 m behind the screen. |
 | [`python_tracker`](python_tracker) | MediaPipe Face Landmarker webcam tracker and OpenCV camera calibration tool. |
 | [`tools`](tools) | Optional Unity plugin setup and printable checkerboard. |
 
@@ -26,6 +26,8 @@ Double-click [`Run-HeadTrackedDemo.cmd`](Run-HeadTrackedDemo.cmd). It starts the
 The Windows player lives at `Builds/HeadTrackedDemo/HeadTrackedDemo.exe` in the prepared checkout. Build output, the Python environment, and the Face Landmarker model are deliberately excluded from Git; a new clone needs the setup below.
 
 In the demo, wait for **Tracking: FACE FOUND**. Move your head left/right, up/down, and toward/away from the monitor. The default shallow layout places the red plant 6 cm in front of the screen plane; it should shift in the opposite direction from the chair and green plant behind the screen. Open **Model size and depth** to adjust real model heights and centre depths, or select **Depth stress test** for the earlier 18 cm protrusion. If it stays at **NO FACE**, check the webcam number, lighting, and camera permission. Enter the physical display measurements and capture a reference distance before judging the geometry.
+
+A purple chair (1 m tall) stands **3 m behind the screen**, and a blue plant (1.4 m tall) stands **6 m behind it**. They stay distant when switching the near-model depth presets. Their height and depth are also editable; depth accepts up to 15 m. Older saved four-model layouts retain their near-model settings and add these two distant objects at their default positions.
 
 ### Build and run from source
 

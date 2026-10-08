@@ -84,6 +84,10 @@ namespace HeadTracked.Demo
                 rearPlinth, -.08f, new Color(0.55f, 0.76f, 0.53f));
             AddSceneModel("Red plant", "Models/pottedPlant", "Plant, in front of screen", .04f, .10f, -.06f,
                 protrudingPlinth, -.08f, new Color(0.90f, 0.46f, 0.33f));
+            AddSceneModel("Distant chair", "Models/chairDesk", "Chair, distant", -.50f, 1.0f, 3.0f,
+                null, -.18f, new Color(0.68f, 0.50f, 0.91f));
+            AddSceneModel("Distant plant", "Models/pottedPlant", "Plant, distant", .90f, 1.4f, 6.0f,
+                null, -.18f, new Color(0.40f, 0.72f, 0.90f));
             UpdateRoomGeometry();
 
             var sun = new GameObject("Soft key light").AddComponent<Light>();
@@ -169,9 +173,9 @@ namespace HeadTracked.Demo
 
         public void UseDepthPreset(bool deep)
         {
-            if (sceneModels.Count != 4) return;
+            if (sceneModels.Count < 4) return;
             float[] depths = deep ? new[] { -.04f, .29f, .42f, -.18f } : new[] { -.025f, .10f, .16f, -.06f };
-            for (int i = 0; i < sceneModels.Count; i++) sceneModels[i].depthCm = (depths[i] * 100f).ToString("F1");
+            for (int i = 0; i < depths.Length; i++) sceneModels[i].depthCm = (depths[i] * 100f).ToString("F1");
             ApplyModelLayout();
         }
 
@@ -182,9 +186,9 @@ namespace HeadTracked.Demo
             {
                 var model = sceneModels[i];
                 if (!float.TryParse(model.heightCm, out float height) || !float.TryParse(model.depthCm, out float depth) ||
-                    !IsFinite(height) || !IsFinite(depth) || height < 2f || height > 200f || depth < -20f || depth > 200f)
+                    !IsFinite(height) || !IsFinite(depth) || height < 2f || height > 200f || depth < -20f || depth > 1500f)
                 {
-                    notice = "Use model height 2-200 cm and centre depth -20 to +200 cm.";
+                    notice = "Use model height 2-200 cm and centre depth -20 to +1500 cm.";
                     return false;
                 }
                 values[i] = new ModelSizeAndDepth { height = height * .01f, depth = depth * .01f };
@@ -224,13 +228,18 @@ namespace HeadTracked.Demo
                 }
             }
             float front = nearest - .10f, back = farthest + .12f;
+            float roomWidth = Mathf.Max(1.55f, back * 2f);
+            float wallHeight = Mathf.Max(.9f, back * .7f);
             var wallPosition = backWall.position;
             wallPosition.z = back + .01f;
+            wallPosition.y = -.18f + wallHeight * .5f;
             backWall.position = wallPosition;
+            backWall.localScale = new Vector3(roomWidth, wallHeight, .02f);
             var floorPosition = roomFloor.position;
             floorPosition.z = (front + back) * .5f;
             roomFloor.position = floorPosition;
             var floorScale = roomFloor.localScale;
+            floorScale.x = roomWidth;
             floorScale.z = back - front;
             roomFloor.localScale = floorScale;
         }
@@ -242,8 +251,9 @@ namespace HeadTracked.Demo
             try
             {
                 var saved = JsonUtility.FromJson<ModelLayoutFile>(File.ReadAllText(path));
-                if (saved?.models == null || saved.models.Length != sceneModels.Count) return;
-                for (int i = 0; i < sceneModels.Count; i++)
+                if (saved?.models == null || saved.models.Length > sceneModels.Count) return;
+                // Keep an older four-model layout while adding the new distant models at their defaults.
+                for (int i = 0; i < saved.models.Length; i++)
                 {
                     sceneModels[i].heightCm = (saved.models[i].height * 100f).ToString("F1");
                     sceneModels[i].depthCm = (saved.models[i].depth * 100f).ToString("F1");
@@ -477,7 +487,7 @@ namespace HeadTracked.Demo
                         source.GetType().GetMethod("SelectWebcam")?.Invoke(source, new object[] { device.name });
             }
             GUILayout.Label(notice);
-            if (sceneModels.Count == 4)
+            if (sceneModels.Count >= 4)
                 GUILayout.Label($"The red plant centre is {Mathf.Abs(sceneModels[3].depth) * 100f:F1} cm {(sceneModels[3].depth < 0f ? "in front of" : "behind")} the screen.");
             GUILayout.Label("Models need no tracking scripts; the monitor edge still clips them.");
             GUILayout.EndScrollView();

@@ -28,6 +28,10 @@ namespace HeadTracked.Demo.Tests
             Assert.That(Quaternion.Angle(model.rotation, rotation), Is.LessThan(.001f));
             demo.UseDepthPreset(false);
             Assert.That(renderer.bounds.center.z, Is.EqualTo(-.06f).Within(.001f));
+            Assert.That(ModelBounds(GameObject.Find("Chair, distant")).center.z,
+                Is.EqualTo(3f).Within(.001f));
+            Assert.That(ModelBounds(GameObject.Find("Plant, distant")).center.z,
+                Is.EqualTo(6f).Within(.001f));
         }
 
         [UnityTest]
@@ -62,6 +66,16 @@ namespace HeadTracked.Demo.Tests
             Assert.That(protrudingViewport.z, Is.GreaterThan(0f));
             Assert.That(protrudingViewport.x, Is.InRange(0f, 1f));
             Assert.That(protrudingViewport.y, Is.InRange(0f, 1f));
+            foreach (string name in new[] { "Chair, distant", "Plant, distant" })
+            {
+                var distant = GameObject.Find(name);
+                Assert.That(distant, Is.Not.Null);
+                Assert.That(distant.GetComponentInChildren<MeshFilter>(), Is.Not.Null);
+                Vector3 viewport = Camera.main.WorldToViewportPoint(ModelBounds(distant).center);
+                Assert.That(viewport.x, Is.InRange(0f, 1f));
+                Assert.That(viewport.y, Is.InRange(0f, 1f));
+                Assert.That(viewport.z, Is.InRange(Camera.main.nearClipPlane, Camera.main.farClipPlane));
+            }
 
             string screenshotPath = System.Environment.GetEnvironmentVariable("HEADTRACK_CAPTURE");
             if (!string.IsNullOrEmpty(screenshotPath))
@@ -81,6 +95,14 @@ namespace HeadTracked.Demo.Tests
                 Object.Destroy(image);
                 Object.Destroy(target);
             }
+        }
+
+        private static Bounds ModelBounds(GameObject model)
+        {
+            var renderers = model.GetComponentsInChildren<Renderer>();
+            var bounds = renderers[0].bounds;
+            foreach (var renderer in renderers) bounds.Encapsulate(renderer.bounds);
+            return bounds;
         }
     }
 }
