@@ -1,5 +1,8 @@
 using System.Collections;
 using System.IO;
+using System.Net.Sockets;
+using System.Reflection;
+using System.Text;
 using HeadTracked.Display;
 using NUnit.Framework;
 using UnityEngine;
@@ -144,6 +147,55 @@ namespace HeadTracked.Demo.Tests
             var bounds = renderers[0].bounds;
             foreach (var renderer in renderers) bounds.Encapsulate(renderer.bounds);
             return bounds;
+        }
+
+        [UnityTest]
+        public IEnumerator PythonWirePreservesPoseAndGazeAndRejectsStaleOrMismatchedFits()
+        {
+            yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
+            yield return null;
+            var source = Object.FindFirstObjectByType<PythonBridgeSource>();
+            var display = Camera.main.GetComponent<HeadTrackedDisplay>();
+            display.Calibration.webcamPosition = Vector3.zero;
+            display.Calibration.webcamEulerDegrees = Vector3.zero;
+            display.Calibration.mirrorImageX = false;
+            display.Calibration.useRigidFacePose = true;
+            display.Calibration.minimumEyeDistanceFromScreen = .25f;
+            display.Calibration.maximumEyeDistanceFromScreen = 1.5f;
+            int revision = (int)typeof(PythonBridgeSource).GetField("calibrationRevision", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(source);
+            using (var client = new TcpClient())
+            {
+                var connecting = client.ConnectAsync("127.0.0.1", source.Port);
+                float timeout = Time.realtimeSinceStartup + 5f;
+                while (!connecting.IsCompleted && Time.realtimeSinceStartup < timeout) yield return null;
+                Assert.That(connecting.IsCompleted && !connecting.IsFaulted, Is.True);
+                var stream = client.GetStream();
+                foreach (int variant in new[] { 0, 1, 2 })
+                {
+                    int sentRevision = variant == 1 ? revision + 1 : revision;
+                    int age = variant == 2 ? 500 : 5;
+                    string message = "{\"found\":true,\"leftX\":0.45,\"rightX\":0.55,\"leftY\":0.5,\"rightY\":0.5," +
+                        "\"width\":640,\"height\":480,\"confidence\":1,\"poseSupported\":true,\"poseValid\":true," +
+                        "\"poseEyeX\":0.1,\"poseEyeY\":-0.02,\"poseEyeZ\":0.6,\"headYawDegrees\":30," +
+                        "\"gazeValid\":true,\"irisHorizontal\":0.1,\"irisVertical\":-0.05,\"poseConfidence\":0.9," +
+                        "\"inferenceMs\":3,\"poseMs\":0.3,\"trackerFps\":30,\"sequence\":" + (variant + 101) +
+                        ",\"frameAgeMs\":" + age + ",\"calibrationRevision\":" + sentRevision + "}\n";
+                    byte[] bytes = Encoding.UTF8.GetBytes(message);
+                    stream.Write(bytes, 0, bytes.Length);
+                    timeout = Time.realtimeSinceStartup + 5f;
+                    while (display.LatestObservation.sequence != variant + 101 && Time.realtimeSinceStartup < timeout)
+                        yield return null;
+                    Assert.That(display.LatestObservation.sequence, Is.EqualTo(variant + 101));
+                    Assert.That(display.IsTracking, Is.EqualTo(variant == 0));
+                    if (variant == 0)
+                    {
+                        Assert.That(Vector3.Distance(display.EstimatedEyePositionMeters, new Vector3(.1f, .02f, -.6f)), Is.LessThan(.001f));
+                        Assert.That(display.LatestObservation.headEulerDegrees.y, Is.EqualTo(30f));
+                        Assert.That(display.LatestObservation.irisOffset.x, Is.EqualTo(.1f));
+                        Assert.That(display.ResultAgeMilliseconds, Is.GreaterThanOrEqualTo(5f));
+                    }
+                }
+            }
         }
     }
 }

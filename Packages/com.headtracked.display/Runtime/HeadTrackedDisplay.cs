@@ -18,11 +18,23 @@ namespace HeadTracked.Display
         private HeadObservation latest;
         private bool hasLatest;
         private bool initialized;
+        private readonly AdaptiveEyeFilter adaptiveFilter = new AdaptiveEyeFilter();
+        private double lastFilteredObservation = double.NegativeInfinity;
+        private Vector3 filteredEye;
+        private double lastValidTime = double.NegativeInfinity;
+        private double reacquireUntil;
 
         public DisplayCalibration Calibration => calibration;
         public Vector3 EyePositionMeters => currentEye;
         public Vector3 EstimatedEyePositionMeters { get; private set; }
         public bool FreezeViewingDistance { get; set; }
+        public bool UseAdaptiveFilter { get; set; } = true;
+        public float FilterMinimumCutoffHz { get => adaptiveFilter.MinimumCutoffHz; set => adaptiveFilter.MinimumCutoffHz = Mathf.Clamp(value, .5f, 8f); }
+        public float FilterSpeedCoefficient { get => adaptiveFilter.SpeedCoefficient; set => adaptiveFilter.SpeedCoefficient = Mathf.Clamp(value, 0f, 50f); }
+        public HeadObservation LatestObservation => latest;
+        public bool HasObservation => hasLatest;
+        public float ResultAgeMilliseconds => hasLatest ? latest.frameAgeMs +
+            (float)(Time.realtimeSinceStartupAsDouble - latest.receivedAtSeconds) * 1000f : 0f;
         public float TrackingSmoothingSeconds
         {
             get => trackingSmoothingSeconds;
@@ -37,6 +49,11 @@ namespace HeadTracked.Display
         {
             screenPlane = plane;
             observationSource = source;
+            if (source is PythonBridgeSource python) python.ConfigureCalibration(calibration);
+            hasLatest = false;
+            adaptiveFilter.Reset();
+            lastFilteredObservation = double.NegativeInfinity;
+            lastValidTime = double.NegativeInfinity;
         }
 
         public bool CaptureReference()
@@ -47,6 +64,7 @@ namespace HeadTracked.Display
         private void Awake()
         {
             targetCamera = GetComponent<Camera>();
+            if (observationSource is PythonBridgeSource python) python.ConfigureCalibration(calibration);
             currentEye = NeutralEye;
             initialized = true;
         }
@@ -57,19 +75,39 @@ namespace HeadTracked.Display
         {
             if (!initialized) Awake();
             Vector3 estimated = NeutralEye;
-            bool valid = observationSource != null && observationSource.isActiveAndEnabled &&
-                         observationSource.TryGetLatest(out latest) && latest.IsUsable &&
-                         Time.realtimeSinceStartupAsDouble - latest.receivedAtSeconds < observationTimeoutSeconds &&
+            bool available = observationSource != null && observationSource.isActiveAndEnabled &&
+                             observationSource.TryGetLatest(out latest);
+            if (available) hasLatest = true;
+            bool valid = available && latest.IsUsable &&
+                         Time.realtimeSinceStartupAsDouble - latest.receivedAtSeconds + latest.frameAgeMs * .001 < observationTimeoutSeconds &&
                          EyePoseEstimator.TryEstimate(latest, calibration, out estimated);
-            if (valid) hasLatest = true;
+            if (valid && !IsTracking) reacquireUntil = Time.realtimeSinceStartupAsDouble + .12;
             IsTracking = valid;
-            Confidence = valid ? latest.confidence : 0f;
+            Confidence = valid ? (calibration.useRigidFacePose && latest.poseSupported ? latest.poseConfidence : latest.confidence) : 0f;
             if (valid && FreezeViewingDistance) estimated.z = NeutralEye.z;
             EstimatedEyePositionMeters = estimated;
-            Vector3 target = valid ? estimated : NeutralEye;
+            if (valid) lastValidTime = Time.realtimeSinceStartupAsDouble;
+            Vector3 target = valid ? estimated :
+                (Time.realtimeSinceStartupAsDouble - lastValidTime < .12 ? currentEye : NeutralEye);
             float timeConstant = valid ? trackingSmoothingSeconds : returnToNeutralSeconds;
             float alpha = 1f - Mathf.Exp(-Time.unscaledDeltaTime / Mathf.Max(0.001f, timeConstant));
-            currentEye = Vector3.Lerp(currentEye, target, alpha);
+            if (valid && UseAdaptiveFilter)
+            {
+                if (latest.receivedAtSeconds != lastFilteredObservation)
+                {
+                    filteredEye = adaptiveFilter.Filter(estimated, latest.receivedAtSeconds - latest.frameAgeMs * .001);
+                    lastFilteredObservation = latest.receivedAtSeconds;
+                }
+                currentEye = Time.realtimeSinceStartupAsDouble < reacquireUntil
+                    ? Vector3.Lerp(currentEye, filteredEye, 1f - Mathf.Exp(-Time.unscaledDeltaTime / .045f))
+                    : filteredEye;
+            }
+            else
+            {
+                currentEye = Vector3.Lerp(currentEye, target, alpha);
+                adaptiveFilter.Reset();
+                lastFilteredObservation = double.NegativeInfinity;
+            }
 
             targetCamera.transform.SetPositionAndRotation(
                 screenPlane != null ? screenPlane.TransformPoint(currentEye) : currentEye,

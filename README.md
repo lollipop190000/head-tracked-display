@@ -23,6 +23,8 @@ This is a **single-viewer, monoscopic** display. It provides motion parallax, no
 
 Double-click [`Run-HeadTrackedDemo.cmd`](Run-HeadTrackedDemo.cmd). It starts the local Windows player and the Python tracker using webcam **0**. For webcam **1**, run `./Run-HeadTrackedDemo.cmd 1` in PowerShell. The launcher stops the tracker when you close the player with **Alt+F4**.
 
+For the new **eye / head / gaze comparison**, double-click [`Run-TrackingTest.cmd`](Run-TrackingTest.cmd). It opens the centred plant and diagnostic panel, with a calibrated rigid face-pose path, adaptive filtering, nine-point approximate screen-gaze calibration, and numeric CSV recording. See the [test guide](docs/tracking-test.md) for the three motion tests, camera setup, and accuracy/timing limits.
+
 The Windows player lives at `Builds/HeadTrackedDemo/HeadTrackedDemo.exe` in the prepared checkout. Build output, the Python environment, and the Face Landmarker model are deliberately excluded from Git; a new clone needs the setup below.
 
 In the demo, wait for **Tracking: FACE FOUND**. Move your head left/right, up/down, and toward/away from the monitor. The default shallow layout places the red plant 6 cm in front of the screen plane; it should shift in the opposite direction from the chair and green plant behind the screen. Open **Model size and depth** to adjust real model heights and centre depths, or select **Depth stress test** for the earlier 18 cm protrusion. If it stays at **NO FACE**, check the webcam number, lighting, and camera permission. Enter the physical display measurements and capture a reference distance before judging the geometry.
@@ -49,7 +51,7 @@ Open [`Demo`](Demo) as a project in Unity. Open `Assets/Scenes/HeadTrackedDemo.u
 
 ```powershell
 ./python_tracker/.venv/Scripts/python.exe python_tracker/tracker.py --list-cameras
-./python_tracker/.venv/Scripts/python.exe python_tracker/tracker.py --camera 0
+./python_tracker/.venv/Scripts/python.exe python_tracker/tracker.py --camera 0 --calibration-file "$env:USERPROFILE/AppData/LocalLow/DefaultCompany/Demo/tracker_runtime_calibration.json"
 ```
 
 For a standalone player, build the enabled demo scene for **Windows x64** in Unity Build Profiles and save it as `Builds/HeadTrackedDemo/HeadTrackedDemo.exe`. Then use the launcher above. If the Unity CLI is installed, the equivalent command is:
@@ -74,7 +76,7 @@ py -3 python_tracker/download_model.py
 
 The plugin installer downloads and SHA-256 checks the pinned upstream archive (about 290 MB). The archive is ignored by Git. In the demo, press **Unity MediaPipe** and select a webcam from the device list. Press **Python bridge** to return to the external tracker. See [third-party components](THIRD_PARTY.md) for sources and licenses.
 
-Both backends request MediaPipe's facial transformation matrix. Its horizontal axis is used **only to correct the apparent narrowing of the eye spacing when the face yaws**. Head orientation is never applied to the virtual camera or models. At extreme profile angles, the eye observation is rejected rather than allowing an unstable distance estimate.
+The **Python** backend now adds a calibrated 20-landmark rigid face fit, head angles, eye position, iris features, and timing data. Its camera parameters synchronize from Unity automatically when launched with the runtime calibration file. The **Unity-native** backend retains the eye-span estimator: face orientation compensates for apparent narrowing of eye spacing during yaw. Both remain compatible with the same observation interface. Neither applies head orientation or gaze direction to the virtual camera or models.
 
 ## Calibration
 
@@ -118,11 +120,11 @@ https://github.com/lollipop190000/head-tracked-display.git?path=/Packages/com.he
 
 Create a Transform at the physical screen center with scale `(1,1,1)` and local `+Z` into the scene. Add `HeadTrackedDisplay` to the render camera, add one `HeadObservationSource`, and assign both the screen Transform and source to the display component. Set `DisplayCalibration` measurements. Any ordinary 3D mesh placed relative to this plane uses the same camera projection; it needs no tracking script. The package [README](Packages/com.headtracked.display/README.md) has the shorter integration checklist.
 
-Game code can read `EyePositionMeters`, `IsTracking`, `Confidence`, and `SourceStatus`, or subscribe to `PoseUpdated`. `Confidence` is currently a binary face-found value, not a graded landmark quality estimate. The view eases back to its neutral position after tracking loss.
+Game code can read `EyePositionMeters`, `IsTracking`, `Confidence`, `SourceStatus`, and `LatestObservation`, or subscribe to `PoseUpdated`. Python rigid-pose confidence is a reprojection-derived quality heuristic; legacy sources retain binary face-found confidence. Neither is a calibrated probability or measured position accuracy. One Euro filtering runs once per new observation; the view holds briefly on loss and then eases back to neutral.
 
 ## Validation and limitations
 
-The automated suite checks screen corners, physical eye-to-object sightlines at multiple depths, Unity's actual camera viewport projection, parallax direction and scale, yaw-compensated distance, webcam tilt/offset, and metric translation across simulated webcam FOVs and resolutions. The current core run passed **22/22 EditMode** and **2/2 PlayMode** tests. Scene tests also check that depth presets preserve model dimensions and orientation. A prior run with the optional Unity MediaPipe plugin installed passed its native webcam test, and the Python protocol suite passed **3/3** tests. Run the Unity tests with Test Runner's EditMode and PlayMode tabs, and run the Python tests with:
+The automated suite checks screen corners, physical sightlines, actual Unity projection, scale, webcam extrinsics, rigid-pose conversion, gaze isolation, filtering, and synthetic gaze calibration. Scene tests check fixed model transforms, fixation layouts, Python wire fields, stale packets, and calibration revision rejection. The current core run passed **27/27 EditMode**, **4/4 PlayMode**, and **8/8 Python** tests. Synthetic tests do not establish real webcam accuracy. A prior run with the optional Unity MediaPipe plugin installed passed its native webcam test. Run the Unity tests with Test Runner's EditMode and PlayMode tabs, and run the Python tests with:
 
 ```powershell
 ./python_tracker/.venv/Scripts/python.exe -m unittest discover -s python_tracker -p 'test_*.py' -v

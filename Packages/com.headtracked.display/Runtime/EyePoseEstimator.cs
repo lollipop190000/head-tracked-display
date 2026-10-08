@@ -9,6 +9,17 @@ namespace HeadTracked.Display
         {
             eye = default;
             if (!observation.IsUsable || calibration == null) return false;
+            if (calibration.useRigidFacePose && observation.poseSupported)
+            {
+                if (!observation.poseValid || !IsFinite(observation.poseEyeCamera) || observation.poseEyeCamera.z <= 0f)
+                    return false;
+                var cameraEye = observation.poseEyeCamera;
+                if (calibration.mirrorImageX) cameraEye.x = -cameraEye.x;
+                cameraEye.y = -cameraEye.y;
+                cameraEye.z = -cameraEye.z;
+                eye = calibration.webcamPosition + Quaternion.Euler(calibration.webcamEulerDegrees) * cameraEye;
+                return -eye.z >= calibration.minimumEyeDistanceFromScreen && -eye.z <= calibration.maximumEyeDistanceFromScreen;
+            }
 
             float width = observation.frameWidth;
             float height = observation.frameHeight;
@@ -75,6 +86,28 @@ namespace HeadTracked.Display
                 Mathf.Max(calibration.minimumEyeDistanceFromScreen, calibration.maximumEyeDistanceFromScreen));
             eye = new Vector3(local.x, local.y, -distance);
             return true;
+        }
+
+        private static bool IsFinite(Vector3 p) =>
+            !float.IsNaN(p.x) && !float.IsNaN(p.y) && !float.IsNaN(p.z) &&
+            !float.IsInfinity(p.x) && !float.IsInfinity(p.y) && !float.IsInfinity(p.z);
+
+        // Share exactly the same camera parameters with the optional Python PnP fit.
+        public static void CameraIntrinsics(DisplayCalibration c, int width, int height,
+            out float fx, out float fy, out float cx, out float cy)
+        {
+            float focal = width / (2f * Mathf.Tan(c.horizontalFovDegrees * Mathf.Deg2Rad * .5f));
+            float span = c.referenceFrameWidth > 0 ? c.referenceEyeSpanPixels * width / c.referenceFrameWidth : 0f;
+            float depth = ReferenceCameraDepth(c, span, width, height, focal);
+            if (c.useEyeSeparationForBasicScale && span > 1f && c.measuredEyeSeparationMeters > 0f)
+                focal = span * depth / c.measuredEyeSeparationMeters;
+            float sx = c.intrinsicsImageWidth > 0 ? (float)width / c.intrinsicsImageWidth : 1f;
+            float sy = c.intrinsicsImageHeight > 0 ? (float)height / c.intrinsicsImageHeight : 1f;
+            bool precise = c.usePreciseIntrinsics && c.focalXPixels > 1f;
+            fx = precise ? c.focalXPixels * sx : focal;
+            fy = precise && c.focalYPixels > 1f ? c.focalYPixels * sy : fx;
+            cx = precise ? c.principalXPixels * sx : width * .5f;
+            cy = precise ? c.principalYPixels * sy : height * .5f;
         }
 
         private static float ReferenceCameraDepth(DisplayCalibration c, float referenceSpan,

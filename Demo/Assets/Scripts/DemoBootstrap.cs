@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
+using System.Globalization;
 using HeadTracked.Display;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -26,6 +28,30 @@ namespace HeadTracked.Demo
         private bool showModelSettings;
         private bool showScreenRuler;
         private bool isolatePlant;
+        private bool showTrackingTest;
+        private int motionTest;
+        private double lastDiagnosticFrame = double.NegativeInfinity;
+        private Vector3 testEyeOrigin;
+        private Vector3 testHeadOrigin;
+        private bool hasTestOrigin;
+        private ScreenGazeCalibration gazeCalibration = new ScreenGazeCalibration();
+        private Vector2 gazePoint;
+        private bool gazeAvailable;
+        private bool showGazePoint = true;
+        private bool calibratingGaze, capturingGaze;
+        private int gazeTargetIndex, gazeTargetSamples;
+        private float gazeCaptureStarted;
+        private readonly List<HeadObservation> gazeSamples = new List<HeadObservation>();
+        private readonly List<Vector2> gazeTargets = new List<Vector2>();
+        private static readonly Vector2[] GazePoints = { new Vector2(.5f, .5f), new Vector2(.2f, .8f),
+            new Vector2(.5f, .8f), new Vector2(.8f, .8f), new Vector2(.8f, .5f), new Vector2(.8f, .2f),
+            new Vector2(.5f, .2f), new Vector2(.2f, .2f), new Vector2(.2f, .5f) };
+        private StringBuilder recording;
+        private float recordingEnds;
+        private int recordedMotionTest;
+        private string diagnosticNotice = "";
+        private string currentGazeContext;
+        private float nextGazeContextCheck;
         private Vector2 settingsScroll;
         private Vector3 measurementOrigin;
         private bool hasMeasurementOrigin;
@@ -61,7 +87,161 @@ namespace HeadTracked.Demo
             CopyFieldsFromCalibration();
             LoadIntrinsics();
             if (!Application.isEditor) LoadModelLayout();
+            LoadGazeCalibration();
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "--tracking-test") >= 0)
+            {
+                UseFixationTest(.05f);
+                showModelSettings = false;
+                showTrackingTest = true;
+            }
             notice = "Python bridge selected. Start python_tracker/tracker.py or switch to Unity MediaPipe.";
+        }
+
+        private string GazeContext() => Screen.width + "x" + Screen.height + ":" + JsonUtility.ToJson(display.Calibration);
+
+        private void LoadGazeCalibration()
+        {
+            string path = Path.Combine(Application.persistentDataPath, "screen_gaze_calibration.json");
+            if (!File.Exists(path)) return;
+            try { gazeCalibration = JsonUtility.FromJson<ScreenGazeCalibration>(File.ReadAllText(path)) ?? new ScreenGazeCalibration(); }
+            catch (Exception ex) { diagnosticNotice = "Could not load gaze calibration: " + ex.Message; }
+        }
+
+        private void Update()
+        {
+            if (display == null) return;
+            if (Time.unscaledTime >= nextGazeContextCheck)
+            {
+                currentGazeContext = GazeContext();
+                nextGazeContextCheck = Time.unscaledTime + .5f;
+            }
+            if (recording != null && Time.unscaledTime >= recordingEnds) FinishRecording();
+            if (capturingGaze && Time.unscaledTime - gazeCaptureStarted > 4f)
+            {
+                gazeSamples.RemoveRange(gazeSamples.Count - gazeTargetSamples, gazeTargetSamples);
+                gazeTargets.RemoveRange(gazeTargets.Count - gazeTargetSamples, gazeTargetSamples);
+                gazeTargetSamples = 0;
+                capturingGaze = false;
+                diagnosticNotice = "Not enough valid eye samples. Face forward, open both eyes, then retry Space.";
+            }
+            if (!display.HasObservation) return;
+            var o = display.LatestObservation;
+            if (o.receivedAtSeconds == lastDiagnosticFrame) return;
+            lastDiagnosticFrame = o.receivedAtSeconds;
+            gazeAvailable = display.IsTracking && gazeCalibration.context == currentGazeContext &&
+                gazeCalibration.TryEstimate(o, out gazePoint);
+            if (recording != null)
+            {
+                var eye = display.EstimatedEyePositionMeters;
+                recording.AppendLine(string.Format(CultureInfo.InvariantCulture,
+                    "{0:F3},{1},{2},{3:F5},{4:F5},{5:F5},{6:F2},{7:F2},{8:F2},{9:F4},{10:F4},{11},{12:F2},{13:F2},{14:F2},{15:F2},{16:F2}",
+                    Time.realtimeSinceStartupAsDouble, recordedMotionTest, display.IsTracking ? 1 : 0,
+                    eye.x, eye.y, eye.z, o.headEulerDegrees.x, o.headEulerDegrees.y, o.headEulerDegrees.z,
+                    o.irisOffset.x, o.irisOffset.y, o.gazeValid ? 1 : 0, o.reprojectionErrorPixels,
+                    o.inferenceMs, o.poseMs, display.ResultAgeMilliseconds, o.trackerFps));
+            }
+            if (!capturingGaze || !display.IsTracking || !o.poseValid || !o.gazeValid) return;
+            gazeSamples.Add(o);
+            gazeTargets.Add(GazePoints[gazeTargetIndex]);
+            gazeTargetSamples++;
+            if (gazeTargetSamples < 20) return;
+            capturingGaze = false;
+            if (++gazeTargetIndex < GazePoints.Length) return;
+            calibratingGaze = false;
+            if (gazeCalibration.Fit(gazeSamples, gazeTargets))
+            {
+                gazeCalibration.context = GazeContext();
+                try
+                {
+                    File.WriteAllText(Path.Combine(Application.persistentDataPath, "screen_gaze_calibration.json"),
+                        JsonUtility.ToJson(gazeCalibration, true));
+                    diagnosticNotice = "Gaze calibration saved. Check NEW positions; training fit is not accuracy.";
+                }
+                catch (Exception ex) { diagnosticNotice = "Gaze fitted; could not save: " + ex.Message; }
+            }
+            else diagnosticNotice = "Gaze fit failed. Improve lighting and repeat all nine targets.";
+        }
+
+        private void FinishRecording()
+        {
+            try
+            {
+                string directory = Path.Combine(Application.persistentDataPath, "TrackingTests");
+                Directory.CreateDirectory(directory);
+                string path = Path.Combine(directory, "motion-" + recordedMotionTest + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".csv");
+                File.WriteAllText(path, recording.ToString());
+                diagnosticNotice = "CSV saved: " + path;
+            }
+            catch (Exception ex) { diagnosticNotice = "Could not save CSV: " + ex.Message; }
+            recording = null;
+        }
+
+        private void DrawGazeCalibration()
+        {
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.grayTexture);
+            GUI.Box(new Rect((Screen.width - 740f) * .5f, 12, 740, 72),
+                $"GAZE CALIBRATION {gazeTargetIndex + 1}/9: look at the +, then press Space.\n" +
+                "Keep your head comfortable and roughly still. Both eyes must be visible.\n" +
+                (capturingGaze ? $"Collecting {gazeTargetSamples}/20 new frames..." : "Ready for Space; Esc cancels."));
+            Vector2 p = GazePoints[gazeTargetIndex];
+            GUI.Box(new Rect(p.x * Screen.width - 12, (1f - p.y) * Screen.height - 12, 24, 24), "+");
+            GUI.Box(new Rect(12, Screen.height - 65, Screen.width - 24, 52), diagnosticNotice);
+            if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
+            { calibratingGaze = capturingGaze = false; Event.current.Use(); }
+            if (Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Space && !capturingGaze)
+            {
+                capturingGaze = true;
+                gazeTargetSamples = 0;
+                gazeCaptureStarted = Time.unscaledTime;
+                Event.current.Use();
+            }
+        }
+
+        private void DrawTrackingTest()
+        {
+            if (!showTrackingTest) return;
+            float panelWidth = Mathf.Min(420, Screen.width * .44f);
+            GUILayout.BeginArea(new Rect(Screen.width - panelWidth - 12, 12, panelWidth, Mathf.Min(570, Screen.height - 24)), GUI.skin.box);
+            var o = display.LatestObservation;
+            GUILayout.Label("EYE / HEAD / GAZE TEST");
+            GUILayout.Label($"Pose: {(o.poseSupported ? (o.poseValid ? "RIGID FIT" : "FIT INVALID / synchronizing") : "LEGACY SOURCE")}");
+            GUILayout.Label($"Head degrees: pitch {o.headEulerDegrees.x:F1}, yaw {o.headEulerDegrees.y:F1}, roll {o.headEulerDegrees.z:F1}");
+            GUILayout.Label($"Fit error: {o.reprojectionErrorPixels:F1} px (geometric fit, not true position error)");
+            GUILayout.Label($"Tracker {o.trackerFps:F1} Hz | Face {o.inferenceMs:F1} ms | Pose {o.poseMs:F1} ms");
+            GUILayout.Label($"Result age {display.ResultAgeMilliseconds:F1} ms (excludes exposure/display latency)");
+            motionTest = GUILayout.Toolbar(motionTest, new[] { "Eyes only", "Head turn", "Body move" });
+            GUILayout.Label(motionTest == 0 ? "Keep head still; look left/right with eyes only." :
+                motionTest == 1 ? "Keep body still; turn head while watching the plant. Eyes can physically move with rotation." :
+                "Translate sideways by a measured 10 cm; keep head roughly forward.");
+            if (GUILayout.Button("Set test baseline") && display.IsTracking)
+            { testEyeOrigin = display.EstimatedEyePositionMeters; testHeadOrigin = o.headEulerDegrees; hasTestOrigin = true; }
+            if (hasTestOrigin && display.IsTracking)
+            {
+                Vector3 delta = (display.EstimatedEyePositionMeters - testEyeOrigin) * 100f;
+                GUILayout.Label($"Eye travel cm: {delta.x:F1}, {delta.y:F1}, {delta.z:F1}");
+                GUILayout.Label($"Head change: pitch {Mathf.DeltaAngle(testHeadOrigin.x, o.headEulerDegrees.x):F1}, yaw {Mathf.DeltaAngle(testHeadOrigin.y, o.headEulerDegrees.y):F1}");
+            }
+            if (recording == null && GUILayout.Button("Record selected test for 10 seconds"))
+            {
+                recording = new StringBuilder("time_seconds,test,tracking,eye_x_m,eye_y_m,eye_z_m,pitch_deg,yaw_deg,roll_deg,iris_x,iris_y,gaze_valid,fit_error_px,inference_ms,pose_ms,result_age_ms,tracker_hz\n");
+                recordingEnds = Time.unscaledTime + 10f;
+                recordedMotionTest = motionTest;
+            }
+            if (recording != null) GUILayout.Label($"Recording: {Mathf.Max(0, recordingEnds - Time.unscaledTime):F1} s");
+            bool enabled = GUI.enabled;
+            GUI.enabled = display.IsTracking && o.gazeValid;
+            if (GUILayout.Button("Calibrate approximate screen gaze (9 points)"))
+            {
+                gazeSamples.Clear(); gazeTargets.Clear(); gazeTargetIndex = 0;
+                calibratingGaze = true; capturingGaze = false; diagnosticNotice = "";
+            }
+            GUI.enabled = enabled;
+            showGazePoint = GUILayout.Toggle(showGazePoint, "Show calibrated gaze marker");
+            GUILayout.Label(gazeAvailable ? $"Approximate gaze: {gazePoint.x:F2}, {gazePoint.y:F2}" :
+                "Gaze unavailable: calibrate after camera setup; eyes must be visible.");
+            GUILayout.Label("Gaze does not rotate the render camera or set object depth.");
+            GUILayout.Label(diagnosticNotice);
+            GUILayout.EndArea();
         }
 
         private void MakeEnvironment()
@@ -493,6 +673,11 @@ namespace HeadTracked.Demo
         private void OnGUI()
         {
             if (display == null) return;
+            if (calibratingGaze) { DrawGazeCalibration(); return; }
+            if (showGazePoint && gazeAvailable && display.IsTracking && display.LatestObservation.gazeValid)
+                GUI.Box(new Rect(Mathf.Clamp01(gazePoint.x) * Screen.width - 8,
+                    (1f - Mathf.Clamp01(gazePoint.y)) * Screen.height - 8, 16, 16), "+");
+            DrawTrackingTest();
             if (GUI.Button(new Rect(12, 12, 170, 28), showSettings ? "Hide settings" : "Show settings"))
                 showSettings = !showSettings;
             DrawScreenRuler();
@@ -513,6 +698,8 @@ namespace HeadTracked.Demo
             if (GUILayout.Button("Unity MediaPipe")) SelectProvider(true);
             GUILayout.EndHorizontal();
             if (GUILayout.Button("Start centred +5 cm fixation comparison")) UseFixationTest(.05f);
+            showTrackingTest = GUILayout.Toggle(showTrackingTest, "Show eye / head / gaze test panel");
+            c.useRigidFacePose = GUILayout.Toggle(c.useRigidFacePose, "Use rigid face pose (Python; disable for legacy A/B)");
             c.screenWidth = Mathf.Max(0.1f, Input("Screen width (cm)", widthCm, out widthCm, 0.01f, c.screenWidth));
             c.screenHeight = Mathf.Max(0.1f, Input("Screen height (cm)", heightCm, out heightCm, 0.01f, c.screenHeight));
             c.referenceEyeDistanceFromScreen = Mathf.Max(0.2f,
@@ -551,8 +738,18 @@ namespace HeadTracked.Demo
             showScreenRuler = GUILayout.Toggle(showScreenRuler, "Show 10 cm screen ruler (check with a physical ruler)");
             display.FreezeViewingDistance = GUILayout.Toggle(display.FreezeViewingDistance,
                 "Freeze viewing distance (diagnostic; no forward/back tracking)");
-            GUILayout.Label($"Tracking smoothing time constant: {display.TrackingSmoothingSeconds * 1000f:F0} ms");
-            display.TrackingSmoothingSeconds = GUILayout.HorizontalSlider(display.TrackingSmoothingSeconds, .005f, .10f);
+            display.UseAdaptiveFilter = GUILayout.Toggle(display.UseAdaptiveFilter, "Adaptive eye filter (One Euro)");
+            if (display.UseAdaptiveFilter)
+            {
+                GUILayout.Label($"Minimum cutoff: {display.FilterMinimumCutoffHz:F1} Hz | speed coefficient: {display.FilterSpeedCoefficient:F1}");
+                display.FilterMinimumCutoffHz = GUILayout.HorizontalSlider(display.FilterMinimumCutoffHz, .5f, 8f);
+                display.FilterSpeedCoefficient = GUILayout.HorizontalSlider(display.FilterSpeedCoefficient, 0f, 50f);
+            }
+            else
+            {
+                GUILayout.Label($"Tracking smoothing time constant: {display.TrackingSmoothingSeconds * 1000f:F0} ms");
+                display.TrackingSmoothingSeconds = GUILayout.HorizontalSlider(display.TrackingSmoothingSeconds, .005f, .10f);
+            }
             bool previousEnabled = GUI.enabled;
             GUI.enabled = display.IsTracking;
             if (GUILayout.Button("Set movement measurement origin"))

@@ -15,6 +15,8 @@ namespace HeadTracked.Display
         public Vector3 webcamEulerDegrees = Vector3.zero;
         [Tooltip("Flip the horizontal image coordinate if moving right moves the scene the wrong way.")]
         public bool mirrorImageX = true;
+        [Tooltip("Use calibrated multi-landmark rigid face pose when supplied. Legacy/native sources retain the eye-span estimator.")]
+        public bool useRigidFacePose = true;
 
         [Header("Basic distance calibration")]
         [Range(30f, 110f)] public float horizontalFovDegrees = 60f;

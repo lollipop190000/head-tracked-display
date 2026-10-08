@@ -1,6 +1,7 @@
 param(
     [ValidateRange(0, 20)]
-    [int]$Camera = 0
+    [int]$Camera = 0,
+    [switch]$TrackingTest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,6 +12,7 @@ $trackerScript = Join-Path $projectRoot 'python_tracker\tracker.py'
 $modelFile = Join-Path $projectRoot 'python_tracker\face_landmarker.task'
 $outputLog = Join-Path $projectRoot 'Builds\HeadTrackedDemo\tracker-output.log'
 $errorLog = Join-Path $projectRoot 'Builds\HeadTrackedDemo\tracker-error.log'
+$calibrationFile = Join-Path $env:USERPROFILE 'AppData\LocalLow\DefaultCompany\Demo\tracker_runtime_calibration.json'
 
 foreach ($required in @($gameExe, $pythonExe, $trackerScript, $modelFile)) {
     if (-not (Test-Path -LiteralPath $required)) {
@@ -20,7 +22,8 @@ foreach ($required in @($gameExe, $pythonExe, $trackerScript, $modelFile)) {
 
 Write-Host "Starting webcam $Camera tracker and the Unity demo. Close the game with Alt+F4."
 $tracker = Start-Process -FilePath $pythonExe `
-    -ArgumentList @('-u', ('"' + $trackerScript + '"'), '--camera', [string]$Camera) `
+    -ArgumentList @('-u', ('"' + $trackerScript + '"'), '--camera', [string]$Camera,
+        '--calibration-file', ('"' + $calibrationFile + '"')) `
     -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru `
     -RedirectStandardOutput $outputLog -RedirectStandardError $errorLog
 
@@ -31,8 +34,15 @@ try {
         $details = if (Test-Path -LiteralPath $errorLog) { Get-Content -LiteralPath $errorLog -Raw } else { '' }
         throw "Webcam tracker stopped before the demo opened. $details"
     }
-    Start-Process -FilePath $gameExe -WorkingDirectory (Split-Path -Parent $gameExe) `
-        -WindowStyle Normal -Wait
+    $gameArguments = if ($TrackingTest) { @('--tracking-test') } else { @() }
+    if ($gameArguments.Count -gt 0) {
+        Start-Process -FilePath $gameExe -ArgumentList $gameArguments -WorkingDirectory (Split-Path -Parent $gameExe) `
+            -WindowStyle Normal -Wait
+    }
+    else {
+        Start-Process -FilePath $gameExe -WorkingDirectory (Split-Path -Parent $gameExe) `
+            -WindowStyle Normal -Wait
+    }
 }
 finally {
     $tracker.Refresh()
