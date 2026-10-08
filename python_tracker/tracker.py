@@ -10,6 +10,7 @@ import threading
 import cv2
 import mediapipe as mp
 from pose_estimator import PoseEstimator
+from session_lifetime import SessionLifetime
 
 ROOT = Path(__file__).resolve().parent
 
@@ -102,6 +103,10 @@ def connect(port: int) -> socket.socket | None:
 
 
 def run(args: argparse.Namespace) -> None:
+    lifetime = SessionLifetime(args.lifetime_file)
+    if not lifetime.is_active():
+        print("Launcher session ended; webcam was not opened.")
+        return
     model = Path(args.model)
     if not model.exists():
         raise FileNotFoundError(f"Missing {model}; run download_model.py first")
@@ -125,6 +130,9 @@ def run(args: argparse.Namespace) -> None:
     try:
         with mp.tasks.vision.FaceLandmarker.create_from_options(options) as landmarker:
             while time.monotonic() < deadline:
+                if not lifetime.is_active():
+                    print("Launcher session ended; releasing webcam.")
+                    break
                 newest = capture.get_after(sequence)
                 if newest is None:
                     time.sleep(.002)
@@ -186,6 +194,7 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--model", default=str(ROOT / "face_landmarker.task"))
     parser.add_argument("--calibration-file", help="Unity runtime camera parameters JSON (automatically reloaded)")
+    parser.add_argument("--lifetime-file", help="Launcher heartbeat file; release webcam if removed or stale for 8 seconds")
     parser.add_argument("--benchmark-seconds", type=float, default=0, help="Capture briefly, report timings, and exit")
     arguments = parser.parse_args()
     if arguments.list_cameras:
