@@ -48,6 +48,27 @@ The default shallow preset uses centre depths `-2.5, +10, +16, -6 cm` for the be
 
 The model layout is saved separately as `demo_model_layout.json` in Unity's persistent data directory. The default and saved layouts may be clipped at the screen edge; foreground models must also remain beyond the camera near plane.
 
+## Centred fixation comparison
+
+Press **Start centred +5 cm fixation comparison** near the top of the settings panel. This keeps one green plant, 15 cm tall, with its bounds centre at `(0, 0, +0.05)` metres relative to the screen. The room, supports, and other models are hidden so their contact with a floor does not dominate the comparison. This is an isolated diagnostic layout; hiding context may also weaken depth cues. The renderer still uses the same physically based camera projection.
+
+Open **Model size and depth** and compare the **0 cm**, **+5 cm**, **+15 cm**, and **+30 cm** buttons. These keep target size and X/Y fixed. For a 10 cm lateral eye translation at an eye-to-screen distance of 60 cm, the target centre has these geometric screen displacements:
+
+| Centre depth behind screen | Screen displacement |
+| --- | --- |
+| 0 cm | 0 cm |
+| 5 cm | 0.77 cm |
+| 15 cm | 2.00 cm |
+| 30 cm | 3.33 cm |
+| 3 m | 8.33 cm |
+| 6 m | 9.09 cm |
+
+These are displacements of a point, not predictions of perceived stability. A volumetric model centred at zero depth still has surfaces in front of and behind the screen, so its silhouette can change with the viewpoint. A real stationary object behind a window requires changing pixels on the window plane when the observer moves, even when the observer keeps looking at the object. Gaze fixation alone does not measure the observer's correct viewing position; this package does not track gaze direction or reconstruct retinal motion.
+
+Each model now has independent **X cm**, **Y cm**, and **Depth cm** inputs for its bounds centre. Use **-1/+1** for immediate 1 cm steps. Typed changes require **Apply size and X/Y/depth**. For the single-target test, keep X/Y near zero, and move depth towards the screen if the screen displacement is excessive. X/Y adjustments change the target location, but do not change the lateral displacement factor at constant depth. Supports follow the model's X, bottom height, and depth when visible. Changes remain fixed in world space; models do not follow head movement.
+
+Use **Restore all six models and original positions** to recover the default near and distant layout. **Save calibration** persists X/Y, size, depth, and the isolation choice. Older layout files retain their original X and support height when no position fields were saved. Position tuning cannot fix reversed tracking, an incorrect eye-to-screen distance, an incorrect head translation scale, or latency. If even the shallow target feels unstable, repeat the physical measurement sequence above before interpreting the depth settings as a solution.
+
 ## What the perception papers support
 
 [Kubota & Fukiage (2025)](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1013020) measures depth biases in still indoor photographs. Its approach motivates measuring perceived distance separately from geometric distance; its fitted compression parameters are not validated corrections for this interactive display.

@@ -97,9 +97,50 @@ namespace HeadTracked.Demo.Tests
             }
         }
 
+        [UnityTest]
+        public IEnumerator FixationLayoutsKeepTheTargetFixedAndReduceScreenDisplacement()
+        {
+            yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
+            yield return null;
+            var demo = Object.FindFirstObjectByType<DemoBootstrap>();
+            var plant = GameObject.Find("Plant, behind chair");
+            var chair = GameObject.Find("Chair, distant");
+            var floor = GameObject.Find("Floor");
+            var camera = Camera.main;
+            foreach (float depth in new[] { 0f, .05f, .15f, .30f })
+            {
+                demo.UseFixationTest(depth);
+                var bounds = ModelBounds(plant);
+                Assert.That(Vector3.Distance(bounds.center, new Vector3(0f, 0f, depth)), Is.LessThan(.001f));
+                Assert.That(bounds.size.y, Is.EqualTo(.15f).Within(.001f));
+                Assert.That(plant.activeSelf, Is.True);
+                Assert.That(chair.activeSelf, Is.False);
+                Assert.That(floor.activeSelf, Is.False);
+                Vector3 position = plant.transform.position;
+                Quaternion rotation = plant.transform.rotation;
+                camera.transform.SetPositionAndRotation(new Vector3(-.1f, 0f, -.6f), Quaternion.identity);
+                camera.projectionMatrix = OffAxisProjection.Calculate(camera.transform.position, .53f, .30f, .025f, 20f);
+                float leftX = camera.WorldToViewportPoint(bounds.center).x;
+                camera.transform.position = new Vector3(.1f, 0f, -.6f);
+                camera.projectionMatrix = OffAxisProjection.Calculate(camera.transform.position, .53f, .30f, .025f, 20f);
+                float rightX = camera.WorldToViewportPoint(bounds.center).x;
+                Assert.That((rightX - leftX) * .53f,
+                    Is.EqualTo(.2f * depth / (.6f + depth)).Within(.0001f));
+                Assert.That(plant.transform.position, Is.EqualTo(position));
+                Assert.That(plant.transform.rotation, Is.EqualTo(rotation));
+            }
+            demo.ResetModelLayout();
+            Assert.That(chair.activeSelf, Is.True);
+            Assert.That(floor.activeSelf, Is.True);
+            Assert.That(ModelBounds(chair).center.z, Is.EqualTo(3f).Within(.001f));
+            Assert.That(ModelBounds(plant).center.x, Is.EqualTo(.20f).Within(.001f));
+            Assert.That(ModelBounds(plant).center.z, Is.EqualTo(.16f).Within(.001f));
+            Assert.That(ModelBounds(plant).size.y, Is.EqualTo(.22f).Within(.001f));
+        }
+
         private static Bounds ModelBounds(GameObject model)
         {
-            var renderers = model.GetComponentsInChildren<Renderer>();
+            var renderers = model.GetComponentsInChildren<Renderer>(true);
             var bounds = renderers[0].bounds;
             foreach (var renderer in renderers) bounds.Encapsulate(renderer.bounds);
             return bounds;

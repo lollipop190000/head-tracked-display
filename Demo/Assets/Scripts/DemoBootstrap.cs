@@ -25,6 +25,7 @@ namespace HeadTracked.Demo
         private bool showSettings = true;
         private bool showModelSettings;
         private bool showScreenRuler;
+        private bool isolatePlant;
         private Vector2 settingsScroll;
         private Vector3 measurementOrigin;
         private bool hasMeasurementOrigin;
@@ -159,13 +160,15 @@ namespace HeadTracked.Demo
             {
                 label = label, root = model, plinth = plinth, x = x, supportY = supportY,
                 height = height, depth = depth, heightCm = (height * 100f).ToString("F1"),
-                depthCm = (depth * 100f).ToString("F1")
+                depthCm = (depth * 100f).ToString("F1"), xCm = (x * 100f).ToString("F1"),
+                yCm = ((supportY + height * .5f) * 100f).ToString("F1"),
+                defaultHeight = height, defaultCentre = new Vector3(x, supportY + height * .5f, depth)
             });
         }
 
         private static Bounds ModelBounds(Transform model)
         {
-            var renderers = model.GetComponentsInChildren<Renderer>();
+            var renderers = model.GetComponentsInChildren<Renderer>(true);
             var bounds = renderers[0].bounds;
             foreach (var renderer in renderers) bounds.Encapsulate(renderer.bounds);
             return bounds;
@@ -179,6 +182,46 @@ namespace HeadTracked.Demo
             ApplyModelLayout();
         }
 
+        // Compare a fixed target near eye level, independent of the floor and surrounding models.
+        public void UseFixationTest(float depthMeters)
+        {
+            if (sceneModels.Count < 3) return;
+            var model = sceneModels[2];
+            model.xCm = "0";
+            model.yCm = "0";
+            model.heightCm = "15";
+            model.depthCm = (depthMeters * 100f).ToString("F1");
+            if (!ApplyModelLayout()) return;
+            SetPlantIsolation(true);
+            showModelSettings = true;
+        }
+
+        public void ResetModelLayout()
+        {
+            foreach (var model in sceneModels)
+            {
+                model.heightCm = (model.defaultHeight * 100f).ToString("F1");
+                model.xCm = (model.defaultCentre.x * 100f).ToString("F1");
+                model.yCm = (model.defaultCentre.y * 100f).ToString("F1");
+                model.depthCm = (model.defaultCentre.z * 100f).ToString("F1");
+            }
+            ApplyModelLayout();
+            SetPlantIsolation(false);
+        }
+
+        public void SetPlantIsolation(bool isolate)
+        {
+            isolatePlant = isolate;
+            for (int i = 0; i < sceneModels.Count; i++)
+            {
+                var model = sceneModels[i];
+                model.root.gameObject.SetActive(!isolate || i == 2);
+                if (model.plinth != null) model.plinth.gameObject.SetActive(!isolate);
+            }
+            roomFloor.gameObject.SetActive(!isolate);
+            backWall.gameObject.SetActive(!isolate);
+        }
+
         private bool ApplyModelLayout()
         {
             var values = new ModelSizeAndDepth[sceneModels.Count];
@@ -186,24 +229,32 @@ namespace HeadTracked.Demo
             {
                 var model = sceneModels[i];
                 if (!float.TryParse(model.heightCm, out float height) || !float.TryParse(model.depthCm, out float depth) ||
-                    !IsFinite(height) || !IsFinite(depth) || height < 2f || height > 200f || depth < -20f || depth > 1500f)
+                    !float.TryParse(model.xCm, out float x) || !float.TryParse(model.yCm, out float y) ||
+                    !IsFinite(height) || !IsFinite(depth) || !IsFinite(x) || !IsFinite(y) ||
+                    height < 2f || height > 200f || depth < -20f || depth > 1500f ||
+                    Mathf.Abs(x) > 1500f || Mathf.Abs(y) > 1500f)
                 {
-                    notice = "Use model height 2-200 cm and centre depth -20 to +1500 cm.";
+                    notice = "Use height 2-200 cm, X/Y within +/-1500 cm, depth -20 to +1500 cm.";
                     return false;
                 }
-                values[i] = new ModelSizeAndDepth { height = height * .01f, depth = depth * .01f };
+                values[i] = new ModelSizeAndDepth
+                    { height = height * .01f, depth = depth * .01f, x = x * .01f, y = y * .01f, hasPosition = true };
             }
             for (int i = 0; i < sceneModels.Count; i++)
             {
                 var model = sceneModels[i];
                 model.height = values[i].height;
                 model.depth = values[i].depth;
+                model.x = values[i].x;
+                model.supportY = values[i].y - model.height * .5f;
                 model.root.localScale *= model.height / Mathf.Max(.001f, ModelBounds(model.root).size.y);
                 Vector3 centre = new Vector3(model.x, model.supportY + model.height * .5f, model.depth);
                 model.root.position += centre - ModelBounds(model.root).center;
                 if (model.plinth != null)
                 {
                     var position = model.plinth.position;
+                    position.x = model.x;
+                    position.y = model.supportY - model.plinth.localScale.y * .5f;
                     position.z = model.depth;
                     model.plinth.position = position;
                 }
@@ -257,8 +308,16 @@ namespace HeadTracked.Demo
                 {
                     sceneModels[i].heightCm = (saved.models[i].height * 100f).ToString("F1");
                     sceneModels[i].depthCm = (saved.models[i].depth * 100f).ToString("F1");
+                    if (saved.models[i].hasPosition)
+                    {
+                        sceneModels[i].xCm = (saved.models[i].x * 100f).ToString("F1");
+                        sceneModels[i].yCm = (saved.models[i].y * 100f).ToString("F1");
+                    }
+                    else
+                        sceneModels[i].yCm = ((sceneModels[i].supportY + saved.models[i].height * .5f) * 100f).ToString("F1");
                 }
                 ApplyModelLayout();
+                SetPlantIsolation(saved.isolatePlant);
             }
             catch (Exception ex) { notice = "Could not load model layout: " + ex.Message; }
         }
@@ -326,9 +385,10 @@ namespace HeadTracked.Demo
             {
                 var path = Path.Combine(Application.persistentDataPath, "display_calibration.json");
                 File.WriteAllText(path, JsonUtility.ToJson(display.Calibration, true));
-                var layout = new ModelLayoutFile { models = new ModelSizeAndDepth[sceneModels.Count] };
+                var layout = new ModelLayoutFile { models = new ModelSizeAndDepth[sceneModels.Count], isolatePlant = isolatePlant };
                 for (int i = 0; i < sceneModels.Count; i++)
-                    layout.models[i] = new ModelSizeAndDepth { height = sceneModels[i].height, depth = sceneModels[i].depth };
+                    layout.models[i] = new ModelSizeAndDepth { height = sceneModels[i].height, depth = sceneModels[i].depth,
+                        x = sceneModels[i].x, y = sceneModels[i].supportY + sceneModels[i].height * .5f, hasPosition = true };
                 File.WriteAllText(Path.Combine(Application.persistentDataPath, "demo_model_layout.json"),
                     JsonUtility.ToJson(layout, true));
                 notice = "Saved settings to " + path;
@@ -377,6 +437,17 @@ namespace HeadTracked.Demo
             showModelSettings = GUILayout.Toggle(showModelSettings, "Model size and depth / compare physical layouts");
             if (!showModelSettings) return;
             GUILayout.Label("Height is the real object height. Depth: + behind, - in front.");
+            GUILayout.Label("X/Y are the model centre relative to screen centre; +Y is up.");
+            GUILayout.Label("Centred fixation test: a 15 cm plant at eye level.");
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("0 cm")) UseFixationTest(0f);
+            if (GUILayout.Button("+5 cm")) UseFixationTest(.05f);
+            if (GUILayout.Button("+15 cm")) UseFixationTest(.15f);
+            if (GUILayout.Button("+30 cm")) UseFixationTest(.30f);
+            GUILayout.EndHorizontal();
+            bool isolate = GUILayout.Toggle(isolatePlant, "Only green plant / hide room and supports");
+            if (isolate != isolatePlant) SetPlantIsolation(isolate);
+            if (GUILayout.Button("Restore all six models and original positions")) ResetModelLayout();
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Shallow desktop")) UseDepthPreset(false);
             if (GUILayout.Button("Depth stress test")) UseDepthPreset(true);
@@ -387,9 +458,10 @@ namespace HeadTracked.Demo
                 GUILayout.BeginHorizontal();
                 GUILayout.Label("Height cm", GUILayout.Width(75));
                 model.heightCm = GUILayout.TextField(model.heightCm, GUILayout.Width(65));
-                GUILayout.Label("Depth cm", GUILayout.Width(75));
-                model.depthCm = GUILayout.TextField(model.depthCm, GUILayout.Width(65));
                 GUILayout.EndHorizontal();
+                DrawPositionInput("X cm", ref model.xCm);
+                DrawPositionInput("Y cm", ref model.yCm);
+                DrawPositionInput("Depth cm", ref model.depthCm);
                 float d = -display.EyePositionMeters.z;
                 if (d + model.depth > .025f)
                 {
@@ -400,7 +472,22 @@ namespace HeadTracked.Demo
                 if (ModelBounds(model.root).min.z <= display.EyePositionMeters.z + .025f)
                     GUILayout.Label("This model reaches the camera near plane; move farther from the monitor.");
             }
-            if (GUILayout.Button("Apply model size and depth")) ApplyModelLayout();
+            if (GUILayout.Button("Apply size and X/Y/depth")) ApplyModelLayout();
+        }
+
+        private void DrawPositionInput(string label, ref string value)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(label, GUILayout.Width(75));
+            value = GUILayout.TextField(value, GUILayout.Width(65));
+            bool decrease = GUILayout.Button("-1", GUILayout.Width(42));
+            bool increase = GUILayout.Button("+1", GUILayout.Width(42));
+            if ((decrease || increase) && float.TryParse(value, out float cm) && IsFinite(cm))
+            {
+                value = (cm + (increase ? 1f : -1f)).ToString("F1");
+                ApplyModelLayout();
+            }
+            GUILayout.EndHorizontal();
         }
 
         private void OnGUI()
@@ -425,6 +512,7 @@ namespace HeadTracked.Demo
             if (GUILayout.Button("Python bridge")) SelectProvider(false);
             if (GUILayout.Button("Unity MediaPipe")) SelectProvider(true);
             GUILayout.EndHorizontal();
+            if (GUILayout.Button("Start centred +5 cm fixation comparison")) UseFixationTest(.05f);
             c.screenWidth = Mathf.Max(0.1f, Input("Screen width (cm)", widthCm, out widthCm, 0.01f, c.screenWidth));
             c.screenHeight = Mathf.Max(0.1f, Input("Screen height (cm)", heightCm, out heightCm, 0.01f, c.screenHeight));
             c.referenceEyeDistanceFromScreen = Mathf.Max(0.2f,
@@ -496,21 +584,24 @@ namespace HeadTracked.Demo
 
         private sealed class SceneModel
         {
-            public string label, heightCm, depthCm;
+            public string label, heightCm, depthCm, xCm, yCm;
             public Transform root, plinth;
-            public float x, supportY, height, depth;
+            public float x, supportY, height, depth, defaultHeight;
+            public Vector3 defaultCentre;
         }
 
         [Serializable]
         private sealed class ModelSizeAndDepth
         {
-            public float height, depth;
+            public float height, depth, x, y;
+            public bool hasPosition;
         }
 
         [Serializable]
         private sealed class ModelLayoutFile
         {
             public ModelSizeAndDepth[] models;
+            public bool isolatePlant;
         }
 
         [Serializable]

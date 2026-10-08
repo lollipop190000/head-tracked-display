@@ -29,6 +29,10 @@ In the demo, wait for **Tracking: FACE FOUND**. Move your head left/right, up/do
 
 A purple chair (1 m tall) stands **3 m behind the screen**, and a blue plant (1.4 m tall) stands **6 m behind it**. They stay distant when switching the near-model depth presets. Their height and depth are also editable; depth accepts up to 15 m. Older saved four-model layouts retain their near-model settings and add these two distant objects at their default positions.
 
+For excessive apparent motion, press **Start centred +5 cm fixation comparison**. It places a 15 cm green plant at screen centre and hides the room, supports, and other models. In **Model size and depth**, compare centre depths **0, +5, +15, +30 cm** while looking at the same target. Edit **X/Y/depth** in centimetres, use **-1/+1** for immediate 1 cm steps, or press **Apply size and X/Y/depth** after typing. X/Y refer to the model's bounds centre, with +Y upward. **Restore all six models and original positions** returns to the full demo, including the distant objects. **Save calibration** also saves the layout and isolation choice.
+
+A stationary object behind a physical window changes its screen intersection as the observer moves. Looking at it does not imply stationary screen pixels. Moving an object nearer the screen reduces that displacement; changing only X/Y changes its location, not lateral parallax gain. This comparison changes physical placement and does not compensate for tracking or viewing-distance errors. See [the physical scale guide](docs/physical-scale.md#centred-fixation-comparison).
+
 ### Build and run from source
 
 **Requirements:** Windows, a webcam, Python 3, and Unity **6.3 LTS** with Windows Build Support. The demo uses URP 17.3.0. The Python path pins `mediapipe==1.1.0`; the optional Unity-native path uses MediaPipe Unity Plugin v0.16.3. A normal monitor is sufficient.
