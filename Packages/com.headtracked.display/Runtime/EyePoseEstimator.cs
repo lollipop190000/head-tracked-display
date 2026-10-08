@@ -8,6 +8,27 @@ namespace HeadTracked.Display
         public static bool TryEstimate(HeadObservation observation, DisplayCalibration calibration, out Vector3 eye)
         {
             eye = default;
+            return TryEstimateUncalibrated(observation, calibration, out Vector3 raw) &&
+                TryApplyViewingDistance(raw, observation, calibration, out eye);
+        }
+
+        public static bool TryApplyViewingDistance(Vector3 raw, HeadObservation observation,
+            DisplayCalibration calibration, out Vector3 eye)
+        {
+            eye = raw;
+            if (calibration == null || !IsFinite(raw)) return false;
+            float distance = -raw.z;
+            if (calibration.viewingDistance != null && calibration.viewingDistance.enabled)
+                distance = calibration.viewingDistance.Correct(distance, ViewingDistanceCalibration.Setup(calibration, observation));
+            if (distance < calibration.minimumEyeDistanceFromScreen || distance > calibration.maximumEyeDistanceFromScreen)
+                return false;
+            eye.z = -distance;
+            return true;
+        }
+
+        public static bool TryEstimateUncalibrated(HeadObservation observation, DisplayCalibration calibration, out Vector3 eye)
+        {
+            eye = default;
             if (!observation.IsUsable || calibration == null) return false;
             if (calibration.useRigidFacePose && observation.poseSupported)
             {
@@ -18,7 +39,7 @@ namespace HeadTracked.Display
                 cameraEye.y = -cameraEye.y;
                 cameraEye.z = -cameraEye.z;
                 eye = calibration.webcamPosition + Quaternion.Euler(calibration.webcamEulerDegrees) * cameraEye;
-                return -eye.z >= calibration.minimumEyeDistanceFromScreen && -eye.z <= calibration.maximumEyeDistanceFromScreen;
+                return IsFinite(eye) && -eye.z > .1f && -eye.z < 3f;
             }
 
             float width = observation.frameWidth;
@@ -82,10 +103,8 @@ namespace HeadTracked.Display
             Vector3 cameraRay = new Vector3(midpointRay.x, -midpointRay.y, -1f);
             Vector3 local = calibration.webcamPosition +
                             Quaternion.Euler(calibration.webcamEulerDegrees) * (cameraRay * cameraToEye);
-            float distance = Mathf.Clamp(-local.z, calibration.minimumEyeDistanceFromScreen,
-                Mathf.Max(calibration.minimumEyeDistanceFromScreen, calibration.maximumEyeDistanceFromScreen));
-            eye = new Vector3(local.x, local.y, -distance);
-            return true;
+            eye = local;
+            return IsFinite(eye) && -eye.z > .1f && -eye.z < 3f;
         }
 
         private static bool IsFinite(Vector3 p) =>

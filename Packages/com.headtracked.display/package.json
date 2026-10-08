@@ -1,6 +1,6 @@
 {
   "name": "com.headtracked.display",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "displayName": "Head Tracked Display",
   "description": "Single-viewer off-axis projection for a physical monitor, with interchangeable face trackers.",
   "unity": "6000.3",

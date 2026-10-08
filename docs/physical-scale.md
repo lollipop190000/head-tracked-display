@@ -20,6 +20,19 @@ This is an exact relation for that segment, and an approximate size comparison f
 
 The correct angle for revealing another side comes from the eye-to-object geometry. Model dimensions already affect the projected size and visible silhouette. An extra size-dependent rotation would move the object away from the fixed-world target.
 
+## Forward/back size and visual angle
+
+For an upright segment of height `H`, centred on the viewing axis at depth `z`, the screen height and visual angle are:
+
+```text
+screenHeight = d H / (d + z)
+visualAngle = 2 atan[H / (2 (d + z))]
+```
+
+For `H = 15 cm` and `z = 1 m`, moving from `d = 80 cm` to `40 cm` decreases screen height from **6.67 cm to 4.29 cm**, while visual angle increases from **4.77° to 6.13°**. The screen itself looks larger at the nearer distance. A segment exactly on the screen has constant screen height. The ratio of a distant object's screen height to a nearer object's height decreases on approach; this also occurs when viewing fixed objects through a real window. These equations assume endpoints at the same depth; real mesh surfaces span multiple depths.
+
+An exaggerated change can still come from an incorrect distance estimate. **Run-DepthTest.cmd** separates screen size from visual angle and supports [two measured distance anchors](tracking-test.md#forwardback-distance-calibration). This corrects Z scale/bias without changing lateral tracking. The diagnostic hold now captures the **current rendered distance** instead of snapping to the reference distance. Holding Z disables physical forward/back response; it is a comparison mode, not the calibrated geometry.
+
 ## Basic tracking scale
 
 Previously, the basic estimator used an assumed `60 degree` webcam horizontal field of view for lateral and vertical movement. Capturing a reference calibrated depth, but did not calibrate that movement scale. A mismatched webcam FOV could therefore make a physical head move appear too large or too small.
@@ -41,7 +54,7 @@ Measure interpupillary distance (IPD) where possible. The default `63 mm` is an 
 2. Enter measured IPD, webcam offset, and a physically measured eye-to-screen reference distance. Face forward, enable the basic eye-spacing option, and press **Capture reference distance**.
 3. Press **Set movement measurement origin**. Translate your head horizontally by a measured `10 cm`, keeping its orientation and distance approximately constant. After stopping, the X readout should change by about `10 cm`. Check the mirror setting if its sign is reversed. Judge the settled endpoint so smoothing lag does not masquerade as a scale error.
 4. Open **Model size and depth**. Start with **Shallow desktop**, then compare **Depth stress test**. Heights stay constant between presets. Enter real object heights and centre depths for the objects you want to represent; the `25 cm` chair is a scale model, not a life-sized office chair. Apply the layout and save calibration to persist it.
-5. Temporarily enable **Freeze viewing distance** while moving only laterally. If unintended zoom or floating is reduced, investigate the distance estimate. This diagnostic disables forward/back tracking; turn it off for normal use.
+5. Temporarily enable **Hold current viewing distance** while moving only laterally. If unintended zoom or floating is reduced, investigate the distance estimate. This diagnostic disables forward/back tracking; turn it off for normal use.
 6. Compare filtering while moving and stopping. The adaptive One Euro filter is enabled by default; compare it with the fixed smoothing switch. The fixed value is a filter time constant, not measured camera-to-display latency. Low smoothing can expose jitter, while high smoothing can make a fixed scene appear to lag. The Python path also offers calibrated rigid face pose; see the [eye/head/gaze test](tracking-test.md).
 
 The default shallow preset uses centre depths `-2.5, +10, +16, -6 cm` for the bear, chair, green plant, and red plant. The stress preset uses `-4, +29, +42, -18 cm`. A separate purple chair is 1 m tall at depth `+3 m`, and a blue plant is 1.4 m tall at depth `+6 m`. The presets affect the first four near models; distant models retain their settings. Their dimensions are preserved, and supports and room dimensions follow the placement. Model depth accepts up to `+15 m`. This changes actual virtual positions, without changing the projection rule or multiplying head movement by an arbitrary visual gain.

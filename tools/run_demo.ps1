@@ -1,7 +1,8 @@
 param(
     [ValidateRange(0, 20)]
     [int]$Camera = 0,
-    [switch]$TrackingTest
+    [switch]$TrackingTest,
+    [switch]$DepthTest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -34,7 +35,7 @@ try {
         $details = if (Test-Path -LiteralPath $errorLog) { Get-Content -LiteralPath $errorLog -Raw } else { '' }
         throw "Webcam tracker stopped before the demo opened. $details"
     }
-    $gameArguments = if ($TrackingTest) { @('--tracking-test') } else { @() }
+    $gameArguments = if ($DepthTest) { @('--depth-test') } elseif ($TrackingTest) { @('--tracking-test') } else { @() }
     if ($gameArguments.Count -gt 0) {
         Start-Process -FilePath $gameExe -ArgumentList $gameArguments -WorkingDirectory (Split-Path -Parent $gameExe) `
             -WindowStyle Normal -Wait

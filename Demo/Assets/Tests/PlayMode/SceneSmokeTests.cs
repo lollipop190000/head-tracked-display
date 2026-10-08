@@ -150,6 +150,34 @@ namespace HeadTracked.Demo.Tests
         }
 
         [UnityTest]
+        public IEnumerator DepthComparisonUsesEqualSizePlantsAndRestoresOriginalLayout()
+        {
+            yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
+            yield return null;
+            var demo = Object.FindFirstObjectByType<DemoBootstrap>();
+            var plants = new[] { GameObject.Find("Plant, behind chair"), GameObject.Find("Plant, in front of screen"),
+                GameObject.Find("Plant, distant") };
+            var floor = GameObject.Find("Floor");
+            demo.UseDepthMotionTest();
+            float[] depths = { .05f, .3f, 1f };
+            for (int i = 0; i < plants.Length; i++)
+            {
+                var bounds = ModelBounds(plants[i]);
+                Assert.That(bounds.size.y, Is.EqualTo(.15f).Within(.001f));
+                Assert.That(bounds.center.y, Is.EqualTo(0f).Within(.001f));
+                Assert.That(bounds.center.z, Is.EqualTo(depths[i]).Within(.001f));
+                Assert.That(plants[i].activeSelf, Is.True);
+                Vector3 viewport = Camera.main.WorldToViewportPoint(bounds.center);
+                Assert.That(viewport.x, Is.InRange(0f, 1f));
+            }
+            Assert.That(floor.activeSelf, Is.False);
+            demo.ResetModelLayout();
+            Assert.That(ModelBounds(plants[2]).center.z, Is.EqualTo(6f).Within(.001f));
+            Assert.That(ModelBounds(plants[2]).size.y, Is.EqualTo(1.4f).Within(.001f));
+            Assert.That(floor.activeSelf, Is.True);
+        }
+
+        [UnityTest]
         public IEnumerator PythonWirePreservesPoseAndGazeAndRejectsStaleOrMismatchedFits()
         {
             yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);

@@ -27,7 +27,19 @@ namespace HeadTracked.Display
         public DisplayCalibration Calibration => calibration;
         public Vector3 EyePositionMeters => currentEye;
         public Vector3 EstimatedEyePositionMeters { get; private set; }
-        public bool FreezeViewingDistance { get; set; }
+        public Vector3 UncalibratedEyePositionMeters { get; private set; }
+        public bool HasFreshEyeEstimate { get; private set; }
+        private bool freezeViewingDistance;
+        private float frozenEyeZ;
+        public bool FreezeViewingDistance
+        {
+            get => freezeViewingDistance;
+            set
+            {
+                if (value && !freezeViewingDistance) frozenEyeZ = currentEye.z;
+                freezeViewingDistance = value;
+            }
+        }
         public bool UseAdaptiveFilter { get; set; } = true;
         public float FilterMinimumCutoffHz { get => adaptiveFilter.MinimumCutoffHz; set => adaptiveFilter.MinimumCutoffHz = Mathf.Clamp(value, .5f, 8f); }
         public float FilterSpeedCoefficient { get => adaptiveFilter.SpeedCoefficient; set => adaptiveFilter.SpeedCoefficient = Mathf.Clamp(value, 0f, 50f); }
@@ -78,13 +90,17 @@ namespace HeadTracked.Display
             bool available = observationSource != null && observationSource.isActiveAndEnabled &&
                              observationSource.TryGetLatest(out latest);
             if (available) hasLatest = true;
-            bool valid = available && latest.IsUsable &&
-                         Time.realtimeSinceStartupAsDouble - latest.receivedAtSeconds + latest.frameAgeMs * .001 < observationTimeoutSeconds &&
-                         EyePoseEstimator.TryEstimate(latest, calibration, out estimated);
+            Vector3 raw = NeutralEye;
+            bool rawValid = available && latest.IsUsable &&
+                Time.realtimeSinceStartupAsDouble - latest.receivedAtSeconds + latest.frameAgeMs * .001 < observationTimeoutSeconds &&
+                EyePoseEstimator.TryEstimateUncalibrated(latest, calibration, out raw);
+            HasFreshEyeEstimate = rawValid;
+            UncalibratedEyePositionMeters = raw;
+            bool valid = rawValid && EyePoseEstimator.TryApplyViewingDistance(raw, latest, calibration, out estimated);
             if (valid && !IsTracking) reacquireUntil = Time.realtimeSinceStartupAsDouble + .12;
             IsTracking = valid;
             Confidence = valid ? (calibration.useRigidFacePose && latest.poseSupported ? latest.poseConfidence : latest.confidence) : 0f;
-            if (valid && FreezeViewingDistance) estimated.z = NeutralEye.z;
+            if (valid && FreezeViewingDistance) estimated.z = frozenEyeZ;
             EstimatedEyePositionMeters = estimated;
             if (valid) lastValidTime = Time.realtimeSinceStartupAsDouble;
             Vector3 target = valid ? estimated :

@@ -17,6 +17,7 @@ namespace HeadTracked.Display
         public bool mirrorImageX = true;
         [Tooltip("Use calibrated multi-landmark rigid face pose when supplied. Legacy/native sources retain the eye-span estimator.")]
         public bool useRigidFacePose = true;
+        public ViewingDistanceCalibration viewingDistance = new ViewingDistanceCalibration();
 
         [Header("Basic distance calibration")]
         [Range(30f, 110f)] public float horizontalFovDegrees = 60f;

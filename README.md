@@ -23,7 +23,9 @@ This is a **single-viewer, monoscopic** display. It provides motion parallax, no
 
 Double-click [`Run-HeadTrackedDemo.cmd`](Run-HeadTrackedDemo.cmd). It starts the local Windows player and the Python tracker using webcam **0**. For webcam **1**, run `./Run-HeadTrackedDemo.cmd 1` in PowerShell. The launcher stops the tracker when you close the player with **Alt+F4**.
 
-For the new **eye / head / gaze comparison**, double-click [`Run-TrackingTest.cmd`](Run-TrackingTest.cmd). It opens the centred plant and diagnostic panel, with a calibrated rigid face-pose path, adaptive filtering, nine-point approximate screen-gaze calibration, and numeric CSV recording. See the [test guide](docs/tracking-test.md) for the three motion tests, camera setup, and accuracy/timing limits.
+For the **eye / head / gaze comparison**, double-click [`Run-TrackingTest.cmd`](Run-TrackingTest.cmd). It opens the centred plant and diagnostic panel, with a calibrated rigid face-pose path, adaptive filtering, nine-point approximate screen-gaze calibration, and numeric CSV recording. See the [test guide](docs/tracking-test.md) for the four motion tests, camera setup, and accuracy/timing limits.
+
+For **forward/back motion**, double-click [`Run-DepthTest.cmd`](Run-DepthTest.cmd). Three equal 15 cm plants sit 5, 30, and 100 cm behind the screen. The panel compares raw and rendered distance, projected screen height, and visual angle. Measure two actual eye-to-screen distances, capture each, and apply **measured Z calibration** to correct longitudinal scale/bias while preserving X/Y. **Hold size: XY only** temporarily holds the current render distance for comparison; it disables forward/back parallax. See the [distance calibration steps](docs/tracking-test.md#forwardback-distance-calibration).
 
 The Windows player lives at `Builds/HeadTrackedDemo/HeadTrackedDemo.exe` in the prepared checkout. Build output, the Python environment, and the Face Landmarker model are deliberately excluded from Git; a new clone needs the setup below.
 
@@ -124,7 +126,7 @@ Game code can read `EyePositionMeters`, `IsTracking`, `Confidence`, `SourceStatu
 
 ## Validation and limitations
 
-The automated suite checks screen corners, physical sightlines, actual Unity projection, scale, webcam extrinsics, rigid-pose conversion, gaze isolation, filtering, and synthetic gaze calibration. Scene tests check fixed model transforms, fixation layouts, Python wire fields, stale packets, and calibration revision rejection. The current core run passed **27/27 EditMode**, **4/4 PlayMode**, and **8/8 Python** tests. Synthetic tests do not establish real webcam accuracy. A prior run with the optional Unity MediaPipe plugin installed passed its native webcam test. Run the Unity tests with Test Runner's EditMode and PlayMode tabs, and run the Python tests with:
+The automated suite checks screen corners, physical sightlines, actual Unity projection, scale, webcam extrinsics, rigid-pose conversion, gaze isolation, filtering, synthetic gaze calibration, and measured Z correction. Scene tests check fixed model transforms, fixation/depth layouts, Python wire fields, stale packets, and calibration revision rejection. The current core run passed **33/33 EditMode** and **5/5 PlayMode** tests; the unchanged Python tracker previously passed **8/8**. Synthetic tests do not establish real webcam accuracy. A prior run with the optional Unity MediaPipe plugin installed passed its native webcam test. Run the Unity tests with Test Runner's EditMode and PlayMode tabs, and run the Python tests with:
 
 ```powershell
 ./python_tracker/.venv/Scripts/python.exe -m unittest discover -s python_tracker -p 'test_*.py' -v

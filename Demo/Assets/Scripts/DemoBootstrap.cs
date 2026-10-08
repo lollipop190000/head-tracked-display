@@ -29,6 +29,15 @@ namespace HeadTracked.Demo
         private bool showScreenRuler;
         private bool isolatePlant;
         private bool showTrackingTest;
+        private bool depthComparisonActive;
+        private Vector2 trackingScroll;
+        private string distanceNearCm = "40", distanceFarCm = "80";
+        private bool capturingDistance, distanceCaptureNear, hasNearDistance, hasFarDistance;
+        private float distanceCaptureStarted, measuredCaptureDistance;
+        private float rawNearDistance, rawFarDistance, measuredNearDistance, measuredFarDistance;
+        private string captureDistanceContext, nearDistanceContext, farDistanceContext;
+        private readonly List<float> distanceSamples = new List<float>();
+        private string distanceNotice = "Enter physically measured eye-to-screen distances.";
         private int motionTest;
         private double lastDiagnosticFrame = double.NegativeInfinity;
         private Vector3 testEyeOrigin;
@@ -94,6 +103,13 @@ namespace HeadTracked.Demo
                 showModelSettings = false;
                 showTrackingTest = true;
             }
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "--depth-test") >= 0)
+            {
+                UseDepthMotionTest();
+                showTrackingTest = true;
+                showModelSettings = false;
+                motionTest = 3;
+            }
             notice = "Python bridge selected. Start python_tracker/tracker.py or switch to Unity MediaPipe.";
         }
 
@@ -116,6 +132,8 @@ namespace HeadTracked.Demo
                 nextGazeContextCheck = Time.unscaledTime + .5f;
             }
             if (recording != null && Time.unscaledTime >= recordingEnds) FinishRecording();
+            if (capturingDistance && Time.unscaledTime - distanceCaptureStarted > 4f)
+            { capturingDistance = false; distanceNotice = "Distance capture timed out; face camera and try again."; }
             if (capturingGaze && Time.unscaledTime - gazeCaptureStarted > 4f)
             {
                 gazeSamples.RemoveRange(gazeSamples.Count - gazeTargetSamples, gazeTargetSamples);
@@ -128,17 +146,20 @@ namespace HeadTracked.Demo
             var o = display.LatestObservation;
             if (o.receivedAtSeconds == lastDiagnosticFrame) return;
             lastDiagnosticFrame = o.receivedAtSeconds;
+            CollectDistanceSample(o);
             gazeAvailable = display.IsTracking && gazeCalibration.context == currentGazeContext &&
                 gazeCalibration.TryEstimate(o, out gazePoint);
             if (recording != null)
             {
                 var eye = display.EstimatedEyePositionMeters;
                 recording.AppendLine(string.Format(CultureInfo.InvariantCulture,
-                    "{0:F3},{1},{2},{3:F5},{4:F5},{5:F5},{6:F2},{7:F2},{8:F2},{9:F4},{10:F4},{11},{12:F2},{13:F2},{14:F2},{15:F2},{16:F2}",
+                    "{0:F3},{1},{2},{3:F5},{4:F5},{5:F5},{6:F2},{7:F2},{8:F2},{9:F4},{10:F4},{11},{12:F2},{13:F2},{14:F2},{15:F2},{16:F2},{17:F5},{18:F5},{19}",
                     Time.realtimeSinceStartupAsDouble, recordedMotionTest, display.IsTracking ? 1 : 0,
                     eye.x, eye.y, eye.z, o.headEulerDegrees.x, o.headEulerDegrees.y, o.headEulerDegrees.z,
                     o.irisOffset.x, o.irisOffset.y, o.gazeValid ? 1 : 0, o.reprojectionErrorPixels,
-                    o.inferenceMs, o.poseMs, display.ResultAgeMilliseconds, o.trackerFps));
+                    o.inferenceMs, o.poseMs, display.ResultAgeMilliseconds, o.trackerFps,
+                    -display.UncalibratedEyePositionMeters.z, -display.EyePositionMeters.z,
+                    display.FreezeViewingDistance ? 1 : 0));
             }
             if (!capturingGaze || !display.IsTracking || !o.poseValid || !o.gazeValid) return;
             gazeSamples.Add(o);
@@ -202,6 +223,7 @@ namespace HeadTracked.Demo
             if (!showTrackingTest) return;
             float panelWidth = Mathf.Min(420, Screen.width * .44f);
             GUILayout.BeginArea(new Rect(Screen.width - panelWidth - 12, 12, panelWidth, Mathf.Min(570, Screen.height - 24)), GUI.skin.box);
+            trackingScroll = GUILayout.BeginScrollView(trackingScroll);
             var o = display.LatestObservation;
             GUILayout.Label("EYE / HEAD / GAZE TEST");
             GUILayout.Label($"Pose: {(o.poseSupported ? (o.poseValid ? "RIGID FIT" : "FIT INVALID / synchronizing") : "LEGACY SOURCE")}");
@@ -209,10 +231,15 @@ namespace HeadTracked.Demo
             GUILayout.Label($"Fit error: {o.reprojectionErrorPixels:F1} px (geometric fit, not true position error)");
             GUILayout.Label($"Tracker {o.trackerFps:F1} Hz | Face {o.inferenceMs:F1} ms | Pose {o.poseMs:F1} ms");
             GUILayout.Label($"Result age {display.ResultAgeMilliseconds:F1} ms (excludes exposure/display latency)");
-            motionTest = GUILayout.Toolbar(motionTest, new[] { "Eyes only", "Head turn", "Body move" });
+            GUILayout.Label($"Distance: raw {-display.UncalibratedEyePositionMeters.z * 100f:F1} cm / rendered {-display.EyePositionMeters.z * 100f:F1} cm");
+            if (GUILayout.Button("Forward/back depth comparison")) { UseDepthMotionTest(); motionTest = 3; }
+            motionTest = GUILayout.Toolbar(motionTest, new[] { "Eyes", "Head", "Sideways", "Depth" });
             GUILayout.Label(motionTest == 0 ? "Keep head still; look left/right with eyes only." :
                 motionTest == 1 ? "Keep body still; turn head while watching the plant. Eyes can physically move with rotation." :
-                "Translate sideways by a measured 10 cm; keep head roughly forward.");
+                motionTest == 2 ? "Translate sideways by a measured 10 cm; keep head roughly forward." :
+                "Move towards/away from the screen. Raw distance must decrease/increase respectively.");
+            if (motionTest == 3) DrawDistanceSettings();
+            if (depthComparisonActive) DrawDepthPredictions();
             if (GUILayout.Button("Set test baseline") && display.IsTracking)
             { testEyeOrigin = display.EstimatedEyePositionMeters; testHeadOrigin = o.headEulerDegrees; hasTestOrigin = true; }
             if (hasTestOrigin && display.IsTracking)
@@ -223,7 +250,7 @@ namespace HeadTracked.Demo
             }
             if (recording == null && GUILayout.Button("Record selected test for 10 seconds"))
             {
-                recording = new StringBuilder("time_seconds,test,tracking,eye_x_m,eye_y_m,eye_z_m,pitch_deg,yaw_deg,roll_deg,iris_x,iris_y,gaze_valid,fit_error_px,inference_ms,pose_ms,result_age_ms,tracker_hz\n");
+                recording = new StringBuilder("time_seconds,test,tracking,eye_x_m,eye_y_m,eye_z_m,pitch_deg,yaw_deg,roll_deg,iris_x,iris_y,gaze_valid,fit_error_px,inference_ms,pose_ms,result_age_ms,tracker_hz,raw_distance_m,render_distance_m,z_held\n");
                 recordingEnds = Time.unscaledTime + 10f;
                 recordedMotionTest = motionTest;
             }
@@ -241,7 +268,109 @@ namespace HeadTracked.Demo
                 "Gaze unavailable: calibrate after camera setup; eyes must be visible.");
             GUILayout.Label("Gaze does not rotate the render camera or set object depth.");
             GUILayout.Label(diagnosticNotice);
+            GUILayout.EndScrollView();
             GUILayout.EndArea();
+        }
+
+        private void StartDistanceCapture(bool near)
+        {
+            string text = near ? distanceNearCm : distanceFarCm;
+            if (!float.TryParse(text, out float measured) || !IsFinite(measured) || measured < 25f || measured > 150f ||
+                !display.HasFreshEyeEstimate)
+            { distanceNotice = "Use a measured 25-150 cm distance and a valid fresh face fit."; return; }
+            distanceCaptureNear = near;
+            if (near) hasNearDistance = false; else hasFarDistance = false;
+            measuredCaptureDistance = measured * .01f;
+            captureDistanceContext = ViewingDistanceCalibration.Setup(display.Calibration, display.LatestObservation);
+            distanceSamples.Clear(); capturingDistance = true;
+            distanceCaptureStarted = Time.unscaledTime;
+            distanceNotice = "Hold still, face forward: collecting 20 new frames.";
+        }
+
+        private void CollectDistanceSample(HeadObservation observation)
+        {
+            if (!capturingDistance || !display.HasFreshEyeEstimate) return;
+            if (captureDistanceContext != ViewingDistanceCalibration.Setup(display.Calibration, observation))
+            { capturingDistance = false; distanceNotice = "Camera setup changed; repeat this capture."; return; }
+            distanceSamples.Add(-display.UncalibratedEyePositionMeters.z);
+            if (distanceSamples.Count < 20) return;
+            capturingDistance = false;
+            float mean = 0f, variance = 0f;
+            foreach (float d in distanceSamples) mean += d / distanceSamples.Count;
+            foreach (float d in distanceSamples) variance += (d - mean) * (d - mean) / distanceSamples.Count;
+            if (Mathf.Sqrt(variance) > .015f)
+            { distanceNotice = "Distance varied too much; keep still and retry."; return; }
+            if (distanceCaptureNear)
+            {
+                rawNearDistance = mean; measuredNearDistance = measuredCaptureDistance;
+                nearDistanceContext = captureDistanceContext; hasNearDistance = true;
+            }
+            else
+            {
+                rawFarDistance = mean; measuredFarDistance = measuredCaptureDistance;
+                farDistanceContext = captureDistanceContext; hasFarDistance = true;
+            }
+            distanceNotice = $"Captured {(distanceCaptureNear ? "near" : "far")}: measured {measuredCaptureDistance * 100f:F1} cm, raw {mean * 100f:F1} cm.";
+        }
+
+        private void DrawDistanceSettings()
+        {
+            GUILayout.Label("Physical Z / XY-only comparison");
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Physical XYZ")) display.FreezeViewingDistance = false;
+            if (GUILayout.Button("Hold size: XY only")) display.FreezeViewingDistance = true;
+            GUILayout.EndHorizontal();
+            GUILayout.Label(display.FreezeViewingDistance ? "Z held at activation distance; forward/back parallax disabled." : "Z tracks measured eye position; physical screen-window projection.");
+            GUILayout.Label("Two-distance Z calibration: measure eye to screen, not webcam.");
+            Input("Near measured cm", distanceNearCm, out distanceNearCm, .01f, .4f);
+            Input("Far measured cm", distanceFarCm, out distanceFarCm, .01f, .8f);
+            bool enabled = GUI.enabled;
+            GUI.enabled = !capturingDistance && display.HasFreshEyeEstimate;
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Capture near")) StartDistanceCapture(true);
+            if (GUILayout.Button("Capture far")) StartDistanceCapture(false);
+            GUILayout.EndHorizontal();
+            GUI.enabled = !capturingDistance && hasNearDistance && hasFarDistance;
+            if (GUILayout.Button("Apply measured Z calibration"))
+            {
+                string setup = ViewingDistanceCalibration.Setup(display.Calibration, display.LatestObservation);
+                var fit = display.Calibration.viewingDistance ?? new ViewingDistanceCalibration();
+                if (nearDistanceContext == farDistanceContext && nearDistanceContext == setup &&
+                    fit.Fit(rawNearDistance, measuredNearDistance, rawFarDistance, measuredFarDistance, setup))
+                {
+                    display.Calibration.viewingDistance = fit;
+                    display.FreezeViewingDistance = false;
+                    distanceNotice = "Z scale/bias corrected. X/Y unchanged. Save calibration to persist.";
+                }
+                else distanceNotice = "Fit rejected: separate measured positions by >=10 cm; check direction and camera setup.";
+            }
+            GUI.enabled = enabled;
+            var correction = display.Calibration.viewingDistance;
+            if (correction != null && correction.enabled)
+                GUILayout.Label(correction.Matches(display.Calibration, display.LatestObservation)
+                    ? $"Z correction: scale {correction.scale:F3}, offset {correction.offsetMeters * 100f:F1} cm"
+                    : "Z correction inactive: camera/source setup changed; recapture.");
+            if (GUILayout.Button("Reset Z correction")) display.Calibration.viewingDistance = new ViewingDistanceCalibration();
+            GUILayout.Label(capturingDistance ? $"Capturing distance: {distanceSamples.Count}/20" : distanceNotice);
+        }
+
+        private void DrawDepthPredictions()
+        {
+            float d = -display.EyePositionMeters.z;
+            GUILayout.Label("Equal 15 cm plants: green +5, red +30, blue +100 cm.");
+            GUILayout.Label("Centre-plane prediction: physical screen height / visual angle.");
+            foreach (int index in new[] { 2, 3, 5 })
+            {
+                var model = sceneModels[index];
+                float range = d + model.depth;
+                if (range <= .025f) continue;
+                float height = d * model.height / range;
+                float horizontalRange = Mathf.Sqrt(range * range + Mathf.Pow(model.x - display.EyePositionMeters.x, 2));
+                float centreY = model.supportY + model.height * .5f - display.EyePositionMeters.y;
+                float angle = (Mathf.Atan2(centreY + model.height * .5f, horizontalRange) -
+                    Mathf.Atan2(centreY - model.height * .5f, horizontalRange)) * Mathf.Rad2Deg;
+                GUILayout.Label($"+{model.depth * 100f:F0} cm: {height * 100f:F1} cm on screen / {angle:F1} deg");
+            }
         }
 
         private void MakeEnvironment()
@@ -376,6 +505,34 @@ namespace HeadTracked.Demo
             showModelSettings = true;
         }
 
+        public void UseDepthMotionTest()
+        {
+            if (sceneModels.Count < 6) return;
+            float d = Mathf.Max(.25f, display.Calibration.referenceEyeDistanceFromScreen);
+            int[] indices = { 2, 3, 5 };
+            float[] depths = { .05f, .30f, 1f };
+            for (int i = 0; i < indices.Length; i++)
+            {
+                var model = sceneModels[indices[i]];
+                float screenX = (i - 1) * display.Calibration.screenWidth * .24f;
+                model.xCm = (screenX * (d + depths[i]) / d * 100f).ToString("F1");
+                model.yCm = "0"; model.heightCm = "15";
+                model.depthCm = (depths[i] * 100f).ToString("F1");
+            }
+            if (ApplyModelLayout()) SetDepthComparisonVisibility();
+        }
+
+        private void SetDepthComparisonVisibility()
+        {
+            isolatePlant = false; depthComparisonActive = true;
+            for (int i = 0; i < sceneModels.Count; i++)
+            {
+                sceneModels[i].root.gameObject.SetActive(i == 2 || i == 3 || i == 5);
+                if (sceneModels[i].plinth != null) sceneModels[i].plinth.gameObject.SetActive(false);
+            }
+            roomFloor.gameObject.SetActive(false); backWall.gameObject.SetActive(false);
+        }
+
         public void ResetModelLayout()
         {
             foreach (var model in sceneModels)
@@ -391,6 +548,7 @@ namespace HeadTracked.Demo
 
         public void SetPlantIsolation(bool isolate)
         {
+            depthComparisonActive = false;
             isolatePlant = isolate;
             for (int i = 0; i < sceneModels.Count; i++)
             {
@@ -498,6 +656,7 @@ namespace HeadTracked.Demo
                 }
                 ApplyModelLayout();
                 SetPlantIsolation(saved.isolatePlant);
+                if (saved.depthComparison) SetDepthComparisonVisibility();
             }
             catch (Exception ex) { notice = "Could not load model layout: " + ex.Message; }
         }
@@ -565,7 +724,8 @@ namespace HeadTracked.Demo
             {
                 var path = Path.Combine(Application.persistentDataPath, "display_calibration.json");
                 File.WriteAllText(path, JsonUtility.ToJson(display.Calibration, true));
-                var layout = new ModelLayoutFile { models = new ModelSizeAndDepth[sceneModels.Count], isolatePlant = isolatePlant };
+                var layout = new ModelLayoutFile { models = new ModelSizeAndDepth[sceneModels.Count], isolatePlant = isolatePlant,
+                    depthComparison = depthComparisonActive };
                 for (int i = 0; i < sceneModels.Count; i++)
                     layout.models[i] = new ModelSizeAndDepth { height = sceneModels[i].height, depth = sceneModels[i].depth,
                         x = sceneModels[i].x, y = sceneModels[i].supportY + sceneModels[i].height * .5f, hasPosition = true };
@@ -737,7 +897,7 @@ namespace HeadTracked.Demo
             if (GUILayout.Button("Save calibration")) SaveSettings();
             showScreenRuler = GUILayout.Toggle(showScreenRuler, "Show 10 cm screen ruler (check with a physical ruler)");
             display.FreezeViewingDistance = GUILayout.Toggle(display.FreezeViewingDistance,
-                "Freeze viewing distance (diagnostic; no forward/back tracking)");
+                "Hold current viewing distance (XY only; no forward/back parallax)");
             display.UseAdaptiveFilter = GUILayout.Toggle(display.UseAdaptiveFilter, "Adaptive eye filter (One Euro)");
             if (display.UseAdaptiveFilter)
             {
@@ -799,6 +959,7 @@ namespace HeadTracked.Demo
         {
             public ModelSizeAndDepth[] models;
             public bool isolatePlant;
+            public bool depthComparison;
         }
 
         [Serializable]
