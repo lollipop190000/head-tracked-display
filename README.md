@@ -4,7 +4,7 @@
 
 Head Tracked Display makes an ordinary monitor behave like a window into a fixed 3D scene. A webcam estimates one viewer's eye position. Unity moves the render camera to that position and updates an **off-axis perspective projection** for the measured screen. Put any ordinary 3D model behind or in front of the screen plane; no script or head-driven rotation is added to the model.
 
-![Unity PBR surface comparison: ceramic vase, wood, brass, and steel](docs/demo-realism.png)
+![Unity demo scene with chairs, plants, and a bear model at different depths](docs/demo-neutral.png)
 
 This is a **single-viewer, monoscopic** display. It provides motion parallax, not separate images for the left and right eyes.
 
