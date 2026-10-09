@@ -25,6 +25,9 @@ namespace HeadTracked.Demo
         private string webcamPitch = "0";
         private string ipdMm = "63";
         private bool showSettings = true;
+        private bool showDisplaySize, screenSizeDeriveHeight;
+        private string screenSizeNotice = "";
+        private Vector2 screenSizeScroll;
         private bool showModelSettings;
         private bool showScreenRuler;
         private bool isolatePlant;
@@ -641,7 +644,7 @@ namespace HeadTracked.Demo
             diagnosticNotice = "";
             motionTest = 0;
             showSettings = showGazePoint = true;
-            cleanView = showModelSettings = showTrackingTest = showScreenRuler = false;
+            cleanView = showDisplaySize = showModelSettings = showTrackingTest = showScreenRuler = false;
             settingsScroll = trackingScroll = Vector2.zero;
             CopyFieldsFromCalibration();
             SaveSettings();
@@ -890,6 +893,96 @@ namespace HeadTracked.Demo
 
         private static bool IsFinite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 
+        private void OpenDisplaySize()
+        {
+            var c = display.Calibration;
+            widthCm = (c.screenWidth * 100f).ToString("0.##");
+            heightCm = (c.screenHeight * 100f).ToString("0.##");
+            screenSizeDeriveHeight = c.deriveScreenHeightFromResolution;
+            screenSizeNotice = "";
+            screenSizeScroll = Vector2.zero;
+            showDisplaySize = true;
+        }
+
+        private void ApplyDisplaySize()
+        {
+            if (!float.TryParse(widthCm, out float width) || !IsFinite(width) || width < 10f || width > 300f)
+            { screenSizeNotice = "Enter a width between 10 and 300 cm."; return; }
+            float height;
+            if (screenSizeDeriveHeight)
+                height = width * Screen.height / Mathf.Max(1, Screen.width);
+            else if (!float.TryParse(heightCm, out height))
+            { screenSizeNotice = "Enter a valid height in cm."; return; }
+            if (!IsFinite(height) || height < 10f || height > 200f)
+            { screenSizeNotice = "Enter a height between 10 and 200 cm."; return; }
+            var c = display.Calibration;
+            // Save before applying so a disk failure leaves the current projection unchanged.
+            var saved = JsonUtility.FromJson<DisplayCalibration>(JsonUtility.ToJson(c));
+            saved.screenWidth = width * .01f;
+            saved.screenHeight = height * .01f;
+            saved.deriveScreenHeightFromResolution = screenSizeDeriveHeight;
+            try
+            {
+                File.WriteAllText(Path.Combine(Application.persistentDataPath, "display_calibration.json"),
+                    JsonUtility.ToJson(saved, true));
+            }
+            catch (Exception ex) { screenSizeNotice = "Could not save display size: " + ex.Message; return; }
+            c.screenWidth = saved.screenWidth;
+            c.screenHeight = saved.screenHeight;
+            c.deriveScreenHeightFromResolution = saved.deriveScreenHeightFromResolution;
+            CopyFieldsFromCalibration();
+            showDisplaySize = false;
+            notice = $"Display size applied and saved: {width:0.##} x {height:0.##} cm.";
+        }
+
+        private void DrawDisplaySize()
+        {
+            DrawScreenRuler();
+            float panelWidth = Mathf.Min(440, Screen.width - 24);
+            float panelHeight = Mathf.Min(420, Screen.height - 24);
+            GUILayout.BeginArea(new Rect((Screen.width - panelWidth) * .5f,
+                (Screen.height - panelHeight) * .5f, panelWidth, panelHeight), GUI.skin.box);
+            screenSizeScroll = GUILayout.BeginScrollView(screenSizeScroll);
+            GUILayout.Label("DISPLAY SIZE / centimetres");
+            GUILayout.Label("Measure the visible display area, excluding its bezel.");
+            GUILayout.Label($"Currently applied: {display.Calibration.screenWidth * 100f:0.##} x {display.Calibration.screenHeight * 100f:0.##} cm");
+            GUILayout.Label($"Rendering: {Screen.width} x {Screen.height} px | aspect {(float)Screen.width / Mathf.Max(1, Screen.height):F3}");
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Width (cm)", GUILayout.Width(170));
+            widthCm = GUILayout.TextField(widthCm, GUILayout.Width(100));
+            GUILayout.EndHorizontal();
+            screenSizeDeriveHeight = GUILayout.Toggle(screenSizeDeriveHeight,
+                "Calculate height from width and render resolution");
+            bool previousEnabled = GUI.enabled;
+            if (screenSizeDeriveHeight)
+            {
+                if (float.TryParse(widthCm, out float width) && IsFinite(width))
+                    heightCm = (width * Screen.height / Mathf.Max(1, Screen.width)).ToString("0.##");
+                GUI.enabled = false;
+            }
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Height (cm)", GUILayout.Width(170));
+            heightCm = GUILayout.TextField(heightCm, GUILayout.Width(100));
+            GUILayout.EndHorizontal();
+            GUI.enabled = previousEnabled;
+            GUILayout.Label("Leave automatic height OFF to use both measured dimensions.");
+            if (reportedScreenWidth > 0)
+            {
+                GUILayout.Label($"Monitor hint: about {reportedScreenWidth:F0} x {reportedScreenHeight:F0} cm (rounded).");
+                if (GUILayout.Button("Use monitor width estimate"))
+                { widthCm = reportedScreenWidth.ToString("0.##"); screenSizeDeriveHeight = true; }
+            }
+            showScreenRuler = GUILayout.Toggle(showScreenRuler, "Show horizontal / vertical 10 cm rulers");
+            GUILayout.Label("Rulers use the applied size; apply first, then check them.");
+            if (!string.IsNullOrEmpty(screenSizeNotice)) GUILayout.Label(screenSizeNotice);
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Apply and save")) ApplyDisplaySize();
+            if (GUILayout.Button("Cancel")) showDisplaySize = false;
+            GUILayout.EndHorizontal();
+            GUILayout.EndScrollView();
+            GUILayout.EndArea();
+        }
+
         private void DrawScreenRuler()
         {
             if (!showScreenRuler) return;
@@ -967,6 +1060,7 @@ namespace HeadTracked.Demo
             if (display == null) return;
             if (cleanView) return;
             if (calibratingGaze) { DrawGazeCalibration(); return; }
+            if (showDisplaySize) { DrawDisplaySize(); return; }
             if (showGazePoint && gazeAvailable && display.IsTracking && display.LatestObservation.gazeValid)
                 GUI.Box(new Rect(Mathf.Clamp01(gazePoint.x) * Screen.width - 8,
                     (1f - Mathf.Clamp01(gazePoint.y)) * Screen.height - 8, 16, 16), "+");
@@ -974,9 +1068,12 @@ namespace HeadTracked.Demo
             if (GUI.Button(new Rect(12, 12, 170, 28), showSettings ? "Hide settings" : "Show settings"))
                 showSettings = !showSettings;
             if (GUI.Button(new Rect(190, 12, 262, 28), "Reset demo to defaults")) ResetDemo();
+            if (GUI.Button(new Rect(12, 46, 440, 28),
+                $"Display size: {display.Calibration.screenWidth * 100f:0.##} x {display.Calibration.screenHeight * 100f:0.##} cm / change"))
+                OpenDisplaySize();
             DrawScreenRuler();
             if (!showSettings) return;
-            GUILayout.BeginArea(new Rect(12, 48, 440, Mathf.Min(Screen.height - 60, 690)), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(12, 82, 440, Mathf.Min(Screen.height - 94, 690)), GUI.skin.box);
             settingsScroll = GUILayout.BeginScrollView(settingsScroll);
             GUILayout.Label("HEAD-TRACKED DISPLAY / physical monitor setup");
             GUILayout.Label("Reset restores models and controls, keeping screen / camera calibration.");
@@ -1004,27 +1101,6 @@ namespace HeadTracked.Demo
             if (GUILayout.Button("Start centred +5 cm fixation comparison")) UseFixationTest(.05f);
             showTrackingTest = GUILayout.Toggle(showTrackingTest, "Show eye / head / gaze test panel");
             c.useRigidFacePose = GUILayout.Toggle(c.useRigidFacePose, "Use rigid face pose (Python; disable for legacy A/B)");
-            c.screenWidth = Mathf.Max(0.1f, Input("Screen width (cm)", widthCm, out widthCm, 0.01f, c.screenWidth));
-            c.deriveScreenHeightFromResolution = GUILayout.Toggle(c.deriveScreenHeightFromResolution,
-                "Full-screen square pixels: derive height from measured width");
-            bool heightEnabled = GUI.enabled;
-            if (c.deriveScreenHeightFromResolution)
-            {
-                heightCm = (c.screenHeight * 100f).ToString("F2");
-                GUI.enabled = false;
-            }
-            c.screenHeight = Mathf.Max(0.1f, Input("Screen height (cm)", heightCm, out heightCm, 0.01f, c.screenHeight));
-            GUI.enabled = heightEnabled;
-            GUILayout.Label("Measure the visible panel width. Derived height is not a hardware measurement.");
-            if (reportedScreenWidth > 0)
-            {
-                GUILayout.Label($"Panel reports about {reportedScreenWidth:F0} x {reportedScreenHeight:F0} cm (rounded estimate). Verify both 10 cm rulers.");
-                if (GUILayout.Button("Use reported panel width (estimate)"))
-                {
-                    c.screenWidth = reportedScreenWidth * .01f; widthCm = reportedScreenWidth.ToString("F1");
-                    c.deriveScreenHeightFromResolution = true;
-                }
-            }
             c.referenceEyeDistanceFromScreen = Mathf.Max(0.2f,
                 Input("Reference eye distance (cm)", eyeDistanceCm, out eyeDistanceCm, 0.01f, c.referenceEyeDistanceFromScreen));
             var webcam = c.webcamPosition;

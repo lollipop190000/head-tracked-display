@@ -10,7 +10,9 @@ The top **Reset demo to defaults** button restores and saves the full original m
 
 ## Match the physical display first
 
-The demo enables **Full-screen square pixels: derive height from measured width**:
+Open the top **Display size: … / change** button. Enter the visible panel width and height in centimetres and click **Apply and save**. Both measurements are editable when **Calculate height from width and render resolution** is off. Cancel leaves the applied size unchanged. Saved dimensions load on the next launch and survive **Reset demo to defaults**.
+
+For a full-screen square-pixel panel, **Calculate height from width and render resolution** derives:
 
 ```text
 heightMetres = measuredWidthMetres * renderPixelHeight / renderPixelWidth
@@ -18,7 +20,7 @@ heightMetres = measuredWidthMetres * renderPixelHeight / renderPixelWidth
 
 At 2880×1800, a 53 cm width implies a 33.125 cm height; a 34 cm width implies 21.25 cm. This fixes the ratio, not the absolute scale. Measure the visible panel without its bezel, enter the width, and check **both 10 cm rulers** with a physical ruler. Save afterwards.
 
-When exactly one active panel reports dimensions, the launcher reads an EDID hint. These are rounded centimetres, not measurements. If saved dimensions still equal the old 53×30 cm example, the demo uses the reported width provisionally. Other saved dimensions are retained. **Use reported panel width (estimate)** reapplies the hint. Multiple displays require manual measurement; the launcher removes an old hint instead of guessing a panel.
+When exactly one active panel reports dimensions, the launcher reads an EDID hint. These are rounded centimetres, not measurements. If saved dimensions still equal the old 53×30 cm example, the demo uses the reported width provisionally. Other saved dimensions are retained. **Use monitor width estimate** fills the width draft and selects automatic height; **Apply and save** applies it. Multiple displays require manual measurement; the launcher removes an old hint instead of guessing a panel.
 
 Disable automatic height derivation to enter two independent measurements. The package exposes `DisplayCalibration.deriveScreenHeightFromResolution`, default **false**. This mode assumes a full-panel camera. Smaller windows or letterboxed views need their actual physical viewport dimensions and position. Recheck the rulers after changing display scaling or resolution.
 
