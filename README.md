@@ -33,6 +33,8 @@ For **surface realism**, double-click [`Run-RealismTest.cmd`](Run-RealismTest.cm
 
 The Windows player lives at `Builds/HeadTrackedDemo/HeadTrackedDemo.exe` in the prepared checkout. Build output, the Python environment, and the Face Landmarker model are deliberately excluded from Git; a new clone needs the setup below.
 
+**Reset demo to defaults**, beside **Show/Hide settings**, restores the original full model layout, enhanced rendering, adaptive filter defaults, and XYZ motion. It closes comparison panels and saves the restored layout. Measured screen dimensions, webcam calibration, and completed distance/gaze calibration are retained. **F1** brings the buttons back from a clean view.
+
 In the demo, wait for **Tracking: FACE FOUND**. Move your head left/right, up/down, and toward/away from the monitor. The default shallow layout places the red plant 6 cm in front of the screen plane; it should shift in the opposite direction from the chair and green plant behind the screen. Open **Model size and depth** to adjust real model heights and centre depths, or select **Depth stress test** for the earlier 18 cm protrusion. If it stays at **NO FACE**, check the webcam number, lighting, and camera permission. Enter the physical display measurements and capture a reference distance before judging the geometry.
 
 A purple chair (1 m tall) stands **3 m behind the screen**, and a blue plant (1.4 m tall) stands **6 m behind it**. They stay distant when switching the near-model depth presets. Their height and depth are also editable; depth accepts up to 15 m. Older saved four-model layouts retain their near-model settings and add these two distant objects at their default positions.

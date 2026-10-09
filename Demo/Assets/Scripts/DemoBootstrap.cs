@@ -613,6 +613,41 @@ namespace HeadTracked.Demo
             SetPlantIsolation(false);
         }
 
+        /// <summary>Restore demo presentation and controls, keeping the viewer's physical calibration.</summary>
+        public void ResetDemo()
+        {
+            if (display == null) return;
+            if (recording != null) FinishRecording();
+            ResetModelLayout();
+            enhancedRendering = true;
+            if (renderQuality != null) renderQuality.Apply(true);
+            display.FreezeViewingDistance = false;
+            display.UseAdaptiveFilter = true;
+            var defaults = new AdaptiveEyeFilter();
+            display.FilterMinimumCutoffHz = defaults.MinimumCutoffHz;
+            display.FilterSpeedCoefficient = defaults.SpeedCoefficient;
+            display.TrackingSmoothingSeconds = .045f;
+            display.Configure(screenPlane, source);
+
+            // Cancel unfinished measurements; keep completed screen/camera/Z/gaze calibration.
+            capturingDistance = hasNearDistance = hasFarDistance = false;
+            distanceSamples.Clear();
+            distanceNearCm = "40"; distanceFarCm = "80";
+            distanceNotice = "Enter physically measured eye-to-screen distances.";
+            calibratingGaze = capturingGaze = false;
+            gazeSamples.Clear(); gazeTargets.Clear();
+            gazeTargetIndex = gazeTargetSamples = 0;
+            gazeAvailable = hasTestOrigin = hasMeasurementOrigin = false;
+            diagnosticNotice = "";
+            motionTest = 0;
+            showSettings = showGazePoint = true;
+            cleanView = showModelSettings = showTrackingTest = showScreenRuler = false;
+            settingsScroll = trackingScroll = Vector2.zero;
+            CopyFieldsFromCalibration();
+            SaveSettings();
+            notice = "Demo defaults restored; physical calibration kept. " + notice;
+        }
+
         public void SetPlantIsolation(bool isolate)
         {
             materialStudyActive = false;
@@ -938,11 +973,13 @@ namespace HeadTracked.Demo
             DrawTrackingTest();
             if (GUI.Button(new Rect(12, 12, 170, 28), showSettings ? "Hide settings" : "Show settings"))
                 showSettings = !showSettings;
+            if (GUI.Button(new Rect(190, 12, 262, 28), "Reset demo to defaults")) ResetDemo();
             DrawScreenRuler();
             if (!showSettings) return;
             GUILayout.BeginArea(new Rect(12, 48, 440, Mathf.Min(Screen.height - 60, 690)), GUI.skin.box);
             settingsScroll = GUILayout.BeginScrollView(settingsScroll);
             GUILayout.Label("HEAD-TRACKED DISPLAY / physical monitor setup");
+            GUILayout.Label("Reset restores models and controls, keeping screen / camera calibration.");
             GUILayout.Label($"Tracking: {(display.IsTracking ? "FACE FOUND" : "NO FACE")} | {display.SourceStatus}");
             GUILayout.Label($"Eye (m): {display.EyePositionMeters.ToString("F3")}  Confidence: {display.Confidence:F2}");
             GUILayout.Label($"Display: {Screen.width} x {Screen.height} px");

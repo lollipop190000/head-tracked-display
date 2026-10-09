@@ -6,6 +6,8 @@ Close the previous demo and double-click **Run-RealismTest.cmd**. The physical-w
 
 The vase is 85 cm behind the screen; spheres are 80/90 cm behind it. Their bottoms rest on the wood. **Restore all models and original positions** returns to the full demo. **Save calibration** persists the layout.
 
+The top **Reset demo to defaults** button restores and saves the full original model layout, enhanced rendering, adaptive filter defaults, and XYZ motion. It keeps measured screen dimensions and completed camera/distance/gaze calibration. It also cancels unfinished captures and closes diagnostic panels. **F1** restores the buttons if hidden. A comparison-specific launcher will still select its comparison on the next launch; use **Run-HeadTrackedDemo.cmd** to reopen the saved full layout.
+
 ## Match the physical display first
 
 The demo enables **Full-screen square pixels: derive height from measured width**:
