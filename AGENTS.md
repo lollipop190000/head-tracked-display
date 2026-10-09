@@ -11,4 +11,5 @@ This repository's product is an open-source, reusable Unity package. The demo is
 - Maintain one public Windows CMD entry point, `Run-HeadTrackedDemo.cmd`, backed by `tools/run_demo.ps1`. Use parameters for camera, no-tracker and stop actions; do not add feature-specific CMD files.
 - Organize demo additions by the responsibilities described in `docs/demo-workflow.md`. Keep bootstrap limited to composition.
 - Test meaningful independent combinations and round trips for comparison changes. Preserve existing projection, lifecycle and calibration tests. Update README and affected detailed guides when controls change.
+- Validate runtime package changes in a minimal consumer project without URP or the demo. Declare every used built-in Unity module in the package manifest; do not rely on rendering packages or the test framework to pull it in indirectly.
 - Do not check in local builds, tracker environments, downloaded face models, logs or personal hardware calibration. Preserve MIT licensing and third-party asset attribution.

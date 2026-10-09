@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.4.2
 
+- Declare the built-in Physics and JSON serialization modules directly. Standalone package installs no longer depend on URP or the test framework to make `Collider` and `JsonUtility` available.
 - Add `HeadTrackedDisplay.TrackingEnabled` to hold the current rendered viewpoint while fresh observation collection and filtering continue.
 - Add `BillboardIllusionController.EffectEnabled` to compare dressing on/off without replacing or repositioning content.
 - Reorganize the demo around one stationary comparison, independent switches, minimal setup, a right-hand settings drawer and separate calibration/preferences/experiment saves. Consolidate Windows launchers.

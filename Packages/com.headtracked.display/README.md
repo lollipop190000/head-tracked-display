@@ -8,6 +8,8 @@ Single viewer, physical monitor off-axis projection for Unity 6.3 or newer. The 
 
 In Unity Package Manager, select **Add package from disk** and choose this folder's `package.json`. For a Git installation, use the repository URL with `?path=/Packages/com.headtracked.display`. The package provides the Python TCP bridge without other third-party Unity packages. The optional Unity-native provider activates after installing MediaPipe Unity Plugin v0.16.3 or a compatible later version; use `tools/setup_native_plugin.py` from the repository root to set up the demo.
 
+Unity automatically resolves the package's built-in Audio, JSON serialization and Physics module dependencies. Physics supplies the `Collider` type used to remove primitive colliders from the visual billboard rig; it does not require enabling physical simulation for the display. The package does not require URP or Unity Test Framework. If updating a Git installation from an older version, use **Update** in Package Manager so Unity resolves the new dependencies.
+
 ## Scene setup
 
 1. Add `HeadTrackedDisplay` to the render camera.
