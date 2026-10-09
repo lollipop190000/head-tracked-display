@@ -1,6 +1,6 @@
 {
   "name": "HeadTracked.Demo.SceneTests",
-  "references": ["HeadTracked.Display", "HeadTracked.Demo"],
+  "references": ["HeadTracked.Display", "HeadTracked.Demo", "Unity.RenderPipelines.Universal.Runtime"],
   "optionalUnityReferences": ["TestAssemblies"],
   "autoReferenced": false
 }

@@ -89,10 +89,14 @@ namespace HeadTracked.Display
                 Place(surround[2], new Vector3(0, -(height - band) * .5f, t * .5f), new Vector3(w + 2 * rim, band, t));
                 Place(surround[3], new Vector3(0, (height - band) * .5f, t * .5f), new Vector3(w + 2 * rim, band, t));
                 Place(walls[0], new Vector3(0, 0, d + t * .5f), new Vector3(w + 2 * t, h + 2 * t, t));
-                Place(walls[1], new Vector3(0, -(h + t) * .5f, d * .5f), new Vector3(w, t, d));
-                Place(walls[2], new Vector3(0, (h + t) * .5f, d * .5f), new Vector3(w, t, d));
-                Place(walls[3], new Vector3(-(w + t) * .5f, 0, d * .5f), new Vector3(t, h + 2 * t, d));
-                Place(walls[4], new Vector3((w + t) * .5f, 0, d * .5f), new Vector3(t, h + 2 * t, d));
+                // The rim's inner faces and chamber faces share X/Y planes. Keep their Z ranges
+                // disjoint: overlapping coplanar surfaces shimmer even with anti-aliasing.
+                float start = t * .5f + .0005f;
+                float wallCentre = (start + d) * .5f, wallLength = d - start;
+                Place(walls[1], new Vector3(0, -(h + t) * .5f, wallCentre), new Vector3(w, t, wallLength));
+                Place(walls[2], new Vector3(0, (h + t) * .5f, wallCentre), new Vector3(w, t, wallLength));
+                Place(walls[3], new Vector3(-(w + t) * .5f, 0, wallCentre), new Vector3(t, h + 2 * t, wallLength));
+                Place(walls[4], new Vector3((w + t) * .5f, 0, wallCentre), new Vector3(t, h + 2 * t, wallLength));
                 for (int i = 0; i < 2; i++)
                 {
                     float size = Mathf.Min(w, h) * (i == 0 ? .22f : .14f);
@@ -197,12 +201,17 @@ namespace HeadTracked.Display
             }
             if (settings.animate && !wasAnimating) animationStarted = Time.unscaledTime;
             wasAnimating = settings.animate;
-            float phase = (Time.unscaledTime - animationStarted) / settings.animationPeriodSeconds;
-            float travel = .5f - .5f * Mathf.Cos(phase * Mathf.PI * 2f);
-            float z = settings.animate ? Mathf.Lerp(settings.animationInsideDepth, -settings.animationProtrusion, travel) : settings.staticDepth;
+            float z = settings.staticDepth;
+            if (settings.animate)
+            {
+                float phase = (Time.unscaledTime - animationStarted) / settings.animationPeriodSeconds;
+                float travel = .5f - .5f * Mathf.Cos(phase * Mathf.PI * 2f);
+                z = Mathf.Lerp(settings.animationInsideDepth, -settings.animationProtrusion, travel);
+            }
             Vector3 centre = new Vector3(openingWidth * settings.horizontalOffsetFraction,
                 -openingHeight * .5f + settings.contentHeight * .5f, z);
-            content.transform.localPosition = centre - contentCentre;
+            Vector3 position = centre - contentCentre;
+            if (!content.transform.localPosition.Equals(position)) content.transform.localPosition = position;
         }
 
         // Mesh-local corners avoid world AABB inflation when the physical screen is rotated.

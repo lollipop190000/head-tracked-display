@@ -18,6 +18,24 @@ The default opening is 76% of display width and 70% of height. The chamber is 22
 
 ![Head-tracked billboard scene](demo-billboard.png)
 
+## Edge stability and rendering speed
+
+The demo defaults to **Stable edges** on, **Contact AO** off, and **Render scale** at 85%. These settings are saved with the billboard layout; older saved layouts use the new defaults. Reset restores these defaults while preserving measured display/camera calibration.
+
+| Setting | Effect |
+| --- | --- |
+| Stable edges | URP TAA at Medium quality, 75% history blend, 0.75 jitter scale, no sharpening or negative mip bias. Disables MSAA as required by TAA. Switch off to compare 4× MSAA. |
+| Contact AO | Optional screen-space ambient occlusion. Off avoids the extra occlusion/blur work and its small-scale shading artifacts; direct shadows and material shading remain. |
+| Render scale | 65–100% of each image dimension. Default 85% produces about 72% of the full-resolution pixel count. The entire physical display still maps to the same off-axis projection. Lower values soften detail. |
+| Shadow coverage | One cascade covers the calibrated maximum viewing distance plus chamber/content depth and a 30 cm margin. This replaces the normal scene's 8 m, two-cascade range while billboard mode is active. |
+| Rendering FPS | A half-second average of Unity frame intervals, including frame pacing. The demo targets 60 FPS; this counter does not measure tracking latency or isolated GPU time. |
+
+Rim and chamber faces now have disjoint depth intervals, with 0.5 mm clearance, to remove coplanar depth fighting. Static content only writes its transform when its position changes. The profile restores camera anti-aliasing, MSAA, shadow coverage, render scale, and AO when the mode exits or the demo is destroyed. Tracking filters and physical model placement are unchanged.
+
+[Unity's anti-aliasing reference](https://docs.unity.com/en-us/engine/6000.3/manual/render-pipelines/universal-render-pipeline/anti-aliasing) explains why MSAA alone does not address specular/texture aliasing and why TAA can leave trails during fast motion. Compare **Stable edges** on/off while moving slowly first, then quickly. If trails are distracting, use the MSAA comparison. Start with animation and Contact AO off, then enable each separately. Compare FPS at the same render scale and camera pose after the first few seconds of warm-up. Overall GPU cost depends on history/motion-vector processing as well as pixel count.
+
+The URP profile belongs to the demo. Host projects choose their own anti-aliasing and shadow settings; the package does not change a host's pipeline assets.
+
 ## Use the package in another project
 
 The implementation lives in `Packages/com.headtracked.display/Runtime`, under the MIT license. It has no dependency on the demo, its models, URP assemblies, MediaPipe, or an additional camera. Install the [package](../Packages/com.headtracked.display/README.md) and configure an existing `HeadTrackedDisplay` first.
@@ -65,7 +83,7 @@ The rig follows `display.ScreenPlane` (or the world origin if none is assigned).
 
 Source models are not moved or rescaled. The clone is uniformly scaled to `contentHeight` and centred using renderer bounds. Use render-only model prefabs: scripts/animators on an instantiated prefab still execute, and clone colliders are removed because this component is a visual demonstration. Existing source colliders/materials are untouched. Model proportions and material references are preserved; custom shaders must support the host pipeline. Extremely deep models may intersect the chamber or camera near plane and need adjusted size/depth.
 
-Generated geometry and fallback materials are owned and destroyed by the controller. Assigned materials belong to the caller. Once geometry is built, static dimension/visibility/material updates occur only when values change; there is no per-frame environment capture, new face inference, or second full-screen render pass. Animation changes the clone position only. Actual GPU/frame time must be measured on the target hardware.
+Generated geometry and fallback materials are owned and destroyed by the controller. Assigned materials belong to the caller. Once geometry is built, static dimension/visibility/material updates occur only when values change; the reusable controller performs no per-frame environment capture, new face inference, or additional full-screen render. The demo's optional TAA adds URP history and motion-vector processing. Animation changes the clone position only. Actual GPU/frame time must be measured on the target hardware.
 
 Settings can be serialized with `JsonUtility`; the reusable component performs no disk writes and opens no webcam. The demo saves its mode/settings in `demo_model_layout.json` and handles comparison visibility itself. Older layout files without billboard fields retain their existing mode.
 
@@ -73,9 +91,9 @@ Settings can be serialized with `JsonUtility`; the reusable component performs n
 
 The frame and surround sit at the physical screen plane, with thin 3D rims. Ordinary depth testing lets objects behind it be occluded and objects in front cover it. The enclosure, shadows, and reference blocks add pictorial depth cues. There is no additional image warp, model rotation driven by the head, or change to tracking gain.
 
-Tests check an independent package rig on a translated/rotated screen, source model/material/calibration preservation, fixed content under camera movement, resizing and enable/disable lifecycle, rendered front/behind occlusion, and restoration of an existing demo comparison. Existing projection and tracking tests remain applicable.
+Tests check an independent package rig on a translated/rotated screen, source model/material/calibration preservation, static transform reuse, disjoint rim/chamber faces, resizing and enable/disable lifecycle, rendered front/behind occlusion, and restoration of an existing demo comparison. A demo test renders TAA history at three off-axis eye positions, checks the physical screen corner and unchanged camera projection, and verifies rendering-profile restoration. Existing projection and tracking tests remain applicable.
 
-Validation passed 35 EditMode and 9 PlayMode tests. Both package billboard tests also passed in a separate Unity URP project with no demo scripts/resources. The Windows player built and the billboard launcher connected the Python webcam tracker; closing it released the tracker. These checks do not establish perceived realism, full motion latency, or sustained frame rate with a live viewer.
+Validation passed 35 EditMode and 11 PlayMode tests. All three package billboard tests also passed in a separate Unity URP project with no demo scripts/resources. The Windows player built and the billboard launcher connected the Python webcam tracker; closing it released the tracker. These checks do not establish perceived realism, full motion latency, or sustained frame rate with a live viewer.
 
 The black surround reserves **screen pixels** for crossing the virtual frame. The actual monitor bezel still clips output. This does not produce stereoscopic eye separation or change the physical focus distance. Perceived realism and benefit over the normal mode require a human comparison on a calibrated monitor. This first version targets one planar full-screen display, not a physical L-shaped or multi-panel LED installation.
 

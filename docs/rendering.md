@@ -38,6 +38,8 @@ Disable automatic height derivation to enter two independent measurements. The p
 
 Vase maps import up to 2K, wood up to 1K, and the cubemap at 512 per face. Higher quality uses GPU time; tracking inference is unchanged. Sustained frame rate and presentation latency need a live test at the target resolution.
 
+**Billboard Illusion Mode** temporarily uses its own compact shadow range, TAA, optional SSAO, and adjustable render scale. The settings above return when the mode exits. See [edge stability and rendering speed](billboard-illusion.md#edge-stability-and-rendering-speed) for defaults and A/B controls.
+
 ![Unity material comparison](demo-realism.png)
 
 This image uses a 34 cm width, 16:10 viewport, and neutral 60 cm eye distance. It demonstrates rendering, not webcam accuracy or perceived realism.

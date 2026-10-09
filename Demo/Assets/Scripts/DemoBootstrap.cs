@@ -77,6 +77,11 @@ namespace HeadTracked.Demo
         private BillboardIllusionController billboard;
         private bool billboardActive;
         private int billboardModel;
+        private BillboardRenderProfile billboardRendering;
+        private bool stableBillboardEdges = true, billboardContactAO;
+        private float billboardRenderScale = .85f;
+        private float fpsElapsed, renderFps;
+        private int fpsFrames;
         private readonly List<GameObject> billboardHiddenObjects = new List<GameObject>();
         private readonly List<bool> billboardPreviousVisibility = new List<bool>();
 
@@ -147,6 +152,11 @@ namespace HeadTracked.Demo
         {
             if (display == null) return;
             if (UnityEngine.Input.GetKeyDown(KeyCode.F1)) cleanView = !cleanView;
+            fpsElapsed += Time.unscaledDeltaTime;
+            fpsFrames++;
+            if (fpsElapsed >= .5f)
+            { renderFps = fpsFrames / fpsElapsed; fpsFrames = 0; fpsElapsed = 0f; }
+            ApplyBillboardRendering();
             if (Time.unscaledTime >= nextGazeContextCheck)
             {
                 currentGazeContext = GazeContext();
@@ -493,6 +503,8 @@ namespace HeadTracked.Demo
 
         private void OnDestroy()
         {
+            billboardRendering?.Dispose();
+            billboardRendering = null;
             if (billboard != null)
             {
                 foreach (var material in new[] { billboard.frameMaterial, billboard.surroundMaterial,
@@ -533,6 +545,9 @@ namespace HeadTracked.Demo
             RememberBillboardVisibility(surfaceComparisons);
             billboardActive = true;
             billboard.enabled = true;
+            if (renderQuality != null)
+                billboardRendering = new BillboardRenderProfile(renderQuality, display.GetComponent<Camera>());
+            ApplyBillboardRendering();
             SelectBillboardModel(billboardModel);
             showModelSettings = showTrackingTest = false;
             notice = "Billboard Illusion Mode: move your head; the frame and content use the same physical projection.";
@@ -547,6 +562,8 @@ namespace HeadTracked.Demo
         public void ExitBillboardIllusion()
         {
             if (!billboardActive) return;
+            billboardRendering?.Dispose();
+            billboardRendering = null;
             billboard.enabled = false;
             for (int i = 0; i < billboardHiddenObjects.Count; i++)
                 if (billboardHiddenObjects[i] != null) billboardHiddenObjects[i].SetActive(billboardPreviousVisibility[i]);
@@ -558,6 +575,23 @@ namespace HeadTracked.Demo
         {
             billboardModel = Mathf.Clamp(selection, 0, 2);
             billboard.SetContent(billboardModel == 0 ? null : sceneModels[billboardModel == 1 ? 0 : 1].root.gameObject);
+            billboardRendering?.ResetHistory();
+        }
+
+        public void SetBillboardRendering(bool stableEdges, bool contactAO, float renderScale)
+        {
+            stableBillboardEdges = stableEdges;
+            billboardContactAO = contactAO;
+            billboardRenderScale = float.IsNaN(renderScale) || float.IsInfinity(renderScale) ? .85f : Mathf.Clamp(renderScale, .65f, 1f);
+            ApplyBillboardRendering();
+        }
+
+        private void ApplyBillboardRendering()
+        {
+            if (!billboardActive || billboardRendering == null) return;
+            float viewingDistance = Mathf.Max(display.Calibration.maximumEyeDistanceFromScreen, -display.EyePositionMeters.z);
+            float depth = Mathf.Max(billboard.Settings.boxDepth, billboard.Settings.staticDepth);
+            billboardRendering.Apply(stableBillboardEdges, billboardContactAO, billboardRenderScale, viewingDistance + depth + .3f);
         }
 
         private void DrawBillboardSettings()
@@ -567,6 +601,13 @@ namespace HeadTracked.Demo
             if (!billboardActive) return;
             var s = billboard.Settings;
             GUILayout.Label("Fixed 3D chamber + screen-plane frame; tracking is unchanged.");
+            GUILayout.Label($"Rendering: {renderFps:F0} FPS / {(renderFps > 0f ? 1000f / renderFps : 0f):F1} ms per frame (includes frame pacing)");
+            bool stable = GUILayout.Toggle(stableBillboardEdges, "Stable edges (TAA; off = 4x MSAA comparison)");
+            bool contactAO = GUILayout.Toggle(billboardContactAO, "Contact AO (extra cost; off recommended)");
+            GUILayout.Label($"Render scale: {billboardRenderScale * 100f:F0}% / lower for speed, higher for detail");
+            float scale = GUILayout.HorizontalSlider(billboardRenderScale, .65f, 1f);
+            if (stable != stableBillboardEdges || contactAO != billboardContactAO || scale != billboardRenderScale)
+                SetBillboardRendering(stable, contactAO, scale);
             int selected = GUILayout.Toolbar(billboardModel, new[] { "Metal sphere", "Mini bear", "Mini chair" });
             if (selected != billboardModel) SelectBillboardModel(selected);
             s.showFrame = GUILayout.Toggle(s.showFrame, "Frame / dark surround (off for A/B comparison)");
@@ -736,6 +777,7 @@ namespace HeadTracked.Demo
                 JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(new BillboardIllusionSettings()), billboard.Settings);
             billboardModel = 0;
             enhancedRendering = true;
+            stableBillboardEdges = true; billboardContactAO = false; billboardRenderScale = .85f;
             if (renderQuality != null) renderQuality.Apply(true);
             display.FreezeViewingDistance = false;
             display.UseAdaptiveFilter = true;
@@ -891,6 +933,8 @@ namespace HeadTracked.Demo
                     billboard.Settings.Validate();
                     billboardModel = Mathf.Clamp(saved.billboardModel, 0, 2);
                 }
+                if (saved.hasBillboardRendering)
+                    SetBillboardRendering(saved.stableBillboardEdges, saved.billboardContactAO, saved.billboardRenderScale);
                 if (saved.billboardMode) UseBillboardIllusion();
             }
             catch (Exception ex) { notice = "Could not load model layout: " + ex.Message; }
@@ -982,6 +1026,8 @@ namespace HeadTracked.Demo
                 var layout = new ModelLayoutFile { models = new ModelSizeAndDepth[sceneModels.Count], isolatePlant = isolatePlant,
                     depthComparison = depthComparisonActive, materialStudy = materialStudyActive,
                     billboardMode = billboardActive, billboardModel = billboardModel,
+                    hasBillboardRendering = true, stableBillboardEdges = stableBillboardEdges,
+                    billboardContactAO = billboardContactAO, billboardRenderScale = billboardRenderScale,
                     billboardSettings = billboard != null ? billboard.Settings : null };
                 for (int i = 0; i < sceneModels.Count; i++)
                     layout.models[i] = new ModelSizeAndDepth { height = sceneModels[i].height, depth = sceneModels[i].depth,
@@ -1207,7 +1253,8 @@ namespace HeadTracked.Demo
             GUILayout.Label($"Display: {Screen.width} x {Screen.height} px");
             DrawBillboardSettings();
             if (GUILayout.Button("Realistic material comparison")) UseMaterialStudy();
-            bool quality = GUILayout.Toggle(enhancedRendering, "Enhanced rendering: 4x MSAA / soft shadows / SSAO");
+            bool quality = billboardActive ? enhancedRendering :
+                GUILayout.Toggle(enhancedRendering, "Enhanced rendering: 4x MSAA / soft shadows / SSAO");
             if (quality != enhancedRendering)
             {
                 enhancedRendering = quality;
@@ -1332,6 +1379,8 @@ namespace HeadTracked.Demo
             public bool billboardMode;
             public int billboardModel;
             public BillboardIllusionSettings billboardSettings;
+            public bool hasBillboardRendering, stableBillboardEdges, billboardContactAO;
+            public float billboardRenderScale;
         }
 
         [Serializable]

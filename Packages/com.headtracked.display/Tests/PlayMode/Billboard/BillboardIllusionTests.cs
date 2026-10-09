@@ -36,6 +36,9 @@ namespace HeadTracked.Display.Tests
                 Assert.That(controller.RigRoot.localRotation, Is.EqualTo(Quaternion.identity));
                 Assert.That(controller.ContentInstance.GetComponent<Renderer>().sharedMaterial, Is.SameAs(material));
                 Assert.That(controller.ContentInstance.transform.localScale.y, Is.EqualTo(.08f).Within(1e-5));
+                controller.ContentInstance.transform.hasChanged = false;
+                controller.Refresh();
+                Assert.That(controller.ContentInstance.transform.hasChanged, Is.False, "Static content must not invalidate transforms every frame.");
                 Assert.That(model.transform.position, Is.EqualTo(originalPosition));
                 Assert.That(model.transform.localScale, Is.EqualTo(originalScale));
                 Assert.That(JsonUtility.ToJson(display.Calibration), Is.EqualTo(before));
@@ -58,6 +61,41 @@ namespace HeadTracked.Display.Tests
                 Object.Destroy(controllerObject); Object.Destroy(model);
                 Object.Destroy(cameraObject); Object.Destroy(plane);
             }
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator ChamberFacesNeverOverlapTheCoplanarInnerRim()
+        {
+            var cameraObject = new GameObject("Seam regression display");
+            cameraObject.AddComponent<Camera>();
+            var display = cameraObject.AddComponent<HeadTrackedDisplay>();
+            display.enabled = false;
+            var rigObject = new GameObject("Seam regression billboard");
+            var rig = rigObject.AddComponent<BillboardIllusionController>();
+            try
+            {
+                rig.Configure(display);
+                foreach (float thickness in new[] { .002f, .006f, .03f })
+                {
+                    rig.Settings.wallThickness = thickness;
+                    rig.Settings.boxDepth = .08f;
+                    rig.Refresh();
+                    string[] rimNames = { "bottom", "top", "left", "right" };
+                    string[] wallNames = { "floor", "ceiling", "left", "right" };
+                    for (int i = 0; i < 4; i++)
+                    {
+                        var rim = rig.RigRoot.Find("Screen-plane frame and matte surround/Frame " + rimNames[i]);
+                        var wall = rig.RigRoot.Find("Recessed chamber/Chamber " + wallNames[i]);
+                        float rimBack = rim.localPosition.z + rim.localScale.z * .5f;
+                        float wallFront = wall.localPosition.z - wall.localScale.z * .5f;
+                        Assert.That(wallFront - rimBack, Is.GreaterThan(.0004f), "Coplanar faces need disjoint depth intervals.");
+                        Assert.That(wall.localPosition.z + wall.localScale.z * .5f,
+                            Is.EqualTo(rig.Settings.boxDepth).Within(1e-6), "Chamber must still meet its back wall.");
+                    }
+                }
+            }
+            finally { Object.Destroy(rigObject); Object.Destroy(cameraObject); }
             yield return null;
         }
 

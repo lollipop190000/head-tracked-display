@@ -8,6 +8,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using UnityEngine.Rendering.Universal;
 
 namespace HeadTracked.Demo.Tests
 {
@@ -43,12 +44,14 @@ namespace HeadTracked.Demo.Tests
             string path = System.Environment.GetEnvironmentVariable("HEADTRACK_CAPTURE_BILLBOARD");
             if (!string.IsNullOrEmpty(path))
             {
-                var target = new RenderTexture(1280, 800, 24) { antiAliasing = 4 };
+                var target = new RenderTexture(1280, 800, 24) { antiAliasing = 1 };
                 var image = new Texture2D(1280, 800, TextureFormat.RGB24, false);
                 var old = RenderTexture.active;
                 try
                 {
                     camera.targetTexture = target;
+                    camera.GetUniversalAdditionalCameraData().resetHistory = true;
+                    for (int i = 0; i < 12; i++) { camera.Render(); yield return null; }
                     camera.Render(); RenderTexture.active = target;
                     image.ReadPixels(new Rect(0, 0, 1280, 800), 0, 0); image.Apply();
                     File.WriteAllBytes(path, image.EncodeToPNG());
@@ -58,6 +61,71 @@ namespace HeadTracked.Demo.Tests
             demo.ResetModelLayout();
             Assert.That(billboard.enabled, Is.False);
             Assert.That(GameObject.Find("Chair, distant"), Is.Not.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator BillboardTemporalRenderingPreservesOffAxisProjectionAndRestoresQuality()
+        {
+            yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
+            yield return null;
+            var demo = Object.FindFirstObjectByType<DemoBootstrap>();
+            var camera = Camera.main;
+            var display = camera.GetComponent<HeadTrackedDisplay>();
+            var data = camera.GetUniversalAdditionalCameraData();
+            var quality = Resources.Load<RenderQualitySettings>("Realism/render_quality");
+            float previousScale = quality.pipeline.renderScale, previousDistance = quality.pipeline.shadowDistance;
+            int previousMSAA = quality.pipeline.msaaSampleCount, previousCascades = quality.pipeline.shadowCascadeCount;
+            bool previousAllowMSAA = camera.allowMSAA;
+            var previousAA = data.antialiasing;
+            demo.UseBillboardIllusion();
+            display.enabled = false;
+            camera.enabled = false;
+            var target = new RenderTexture(640, 400, 24) { antiAliasing = 1 };
+            var image = new Texture2D(640, 400, TextureFormat.RGB24, false);
+            var oldActive = RenderTexture.active;
+            try
+            {
+                camera.targetTexture = target;
+                demo.SetBillboardRendering(true, false, .85f);
+                Assert.That(data.antialiasing, Is.EqualTo(AntialiasingMode.TemporalAntiAliasing));
+                Assert.That(quality.pipeline.msaaSampleCount, Is.EqualTo(1));
+                Assert.That(camera.allowMSAA, Is.False);
+                foreach (var eye in new[] { new Vector3(0, 0, -.6f), new Vector3(.08f, .03f, -.45f), new Vector3(-.07f, -.02f, -.8f) })
+                {
+                    camera.transform.SetPositionAndRotation(eye, Quaternion.identity);
+                    float w = display.Calibration.screenWidth, h = display.Calibration.screenHeight;
+                    Matrix4x4 projection = OffAxisProjection.Calculate(eye, w, h, camera.nearClipPlane, camera.farClipPlane);
+                    camera.projectionMatrix = projection;
+                    // Let history and motion vectors settle at each off-axis pose; do not reset for head movement.
+                    for (int i = 0; i < 12; i++) { camera.Render(); yield return null; }
+                    Assert.That(camera.projectionMatrix, Is.EqualTo(projection), "URP jitter must not overwrite the physical projection.");
+                    Vector3 corner = camera.WorldToViewportPoint(new Vector3(w * .5f, h * .5f, 0));
+                    Assert.That(corner.x, Is.EqualTo(1f).Within(1e-5));
+                    Assert.That(corner.y, Is.EqualTo(1f).Within(1e-5));
+                    RenderTexture.active = target;
+                    image.ReadPixels(new Rect(0, 0, 640, 400), 0, 0); image.Apply();
+                    float brightest = 0f;
+                    foreach (var pixel in image.GetPixels32()) brightest = Mathf.Max(brightest, (pixel.r + pixel.g + pixel.b) / 765f);
+                    Assert.That(brightest, Is.GreaterThan(.15f), "History rendering must retain visible scene content.");
+                }
+                demo.SetBillboardRendering(false, true, 1f);
+                Assert.That(data.antialiasing, Is.EqualTo(AntialiasingMode.None));
+                Assert.That(quality.pipeline.msaaSampleCount, Is.EqualTo(4));
+                demo.ExitBillboardIllusion();
+                Assert.That(quality.pipeline.renderScale, Is.EqualTo(previousScale));
+                Assert.That(quality.pipeline.shadowDistance, Is.EqualTo(previousDistance));
+                Assert.That(quality.pipeline.msaaSampleCount, Is.EqualTo(previousMSAA));
+                Assert.That(quality.pipeline.shadowCascadeCount, Is.EqualTo(previousCascades));
+                Assert.That(camera.allowMSAA, Is.EqualTo(previousAllowMSAA));
+                Assert.That(data.antialiasing, Is.EqualTo(previousAA));
+            }
+            finally
+            {
+                demo.ExitBillboardIllusion();
+                camera.targetTexture = null; camera.enabled = true; display.enabled = true;
+                RenderTexture.active = oldActive;
+                Object.Destroy(image); Object.Destroy(target);
+            }
         }
 
         [UnityTest]
