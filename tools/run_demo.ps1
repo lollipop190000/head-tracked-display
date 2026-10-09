@@ -4,6 +4,7 @@ param(
     [switch]$TrackingTest,
     [switch]$DepthTest,
     [switch]$RealismTest,
+    [switch]$BillboardTest,
     [switch]$Stop
 )
 
@@ -86,7 +87,7 @@ try {
     [System.IO.File]::WriteAllText($lifetimeFile, '')
 
     Write-Host "Starting Unity demo and webcam $Camera. Close the game with Alt+F4."
-    $gameArguments = if ($RealismTest) { @('--realism-test') } elseif ($DepthTest) { @('--depth-test') } elseif ($TrackingTest) { @('--tracking-test') } else { @() }
+    $gameArguments = if ($BillboardTest) { @('--billboard-test') } elseif ($RealismTest) { @('--realism-test') } elseif ($DepthTest) { @('--depth-test') } elseif ($TrackingTest) { @('--tracking-test') } else { @() }
     $startGame = @{
         FilePath = $gameExe; WorkingDirectory = (Split-Path -Parent $gameExe)
         WindowStyle = 'Normal'; PassThru = $true

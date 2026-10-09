@@ -1,8 +1,8 @@
 {
   "name": "com.headtracked.display",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "displayName": "Head Tracked Display",
-  "description": "Single-viewer off-axis projection for a physical monitor, with interchangeable face trackers.",
+  "description": "Single-viewer off-axis projection for a physical monitor, interchangeable face trackers, and optional billboard illusion scene geometry.",
   "unity": "6000.3",
   "author": { "name": "Head Tracked Display contributors" },
   "license": "MIT",

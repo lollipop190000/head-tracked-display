@@ -25,6 +25,7 @@ namespace HeadTracked.Display
         private double reacquireUntil;
 
         public DisplayCalibration Calibration => calibration;
+        public Transform ScreenPlane => screenPlane;
         public Vector3 EyePositionMeters => currentEye;
         public Vector3 EstimatedEyePositionMeters { get; private set; }
         public Vector3 UncalibratedEyePositionMeters { get; private set; }

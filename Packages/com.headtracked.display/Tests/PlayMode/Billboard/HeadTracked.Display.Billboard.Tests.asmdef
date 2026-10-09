@@ -1,0 +1,7 @@
+{
+  "name": "HeadTracked.Display.Billboard.Tests",
+  "rootNamespace": "HeadTracked.Display.Tests",
+  "references": ["HeadTracked.Display"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

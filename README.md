@@ -1,6 +1,6 @@
 # Head Tracked Display
 
-[Demo](#run-the-demo) · [Unity package](#use-it-in-another-unity-project) · [Tracking backends](#tracking-backends) · [Surface realism](docs/rendering.md) · [Geometry](#physical-window-geometry) · [Calibration](#calibration)
+[Demo](#run-the-demo) · [Unity package](#use-it-in-another-unity-project) · [Tracking backends](#tracking-backends) · [Billboard illusion](docs/billboard-illusion.md) · [Surface realism](docs/rendering.md) · [Geometry](#physical-window-geometry) · [Calibration](#calibration)
 
 Head Tracked Display makes an ordinary monitor behave like a window into a fixed 3D scene. A webcam estimates one viewer's eye position. Unity moves the render camera to that position and updates an **off-axis perspective projection** for the measured screen. Put any ordinary 3D model behind or in front of the screen plane; no script or head-driven rotation is added to the model.
 
@@ -30,6 +30,8 @@ For the **eye / head / gaze comparison**, double-click [`Run-TrackingTest.cmd`](
 For **forward/back motion**, double-click [`Run-DepthTest.cmd`](Run-DepthTest.cmd). Three equal 15 cm plants sit 5, 30, and 100 cm behind the screen. The panel compares raw and rendered distance, projected screen height, and visual angle. Measure two actual eye-to-screen distances, capture each, and apply **measured Z calibration** to correct longitudinal scale/bias while preserving X/Y. **Hold size: XY only** temporarily holds the current render distance for comparison; it disables forward/back parallax. See the [distance calibration steps](docs/tracking-test.md#forwardback-distance-calibration).
 
 For **surface realism**, double-click [`Run-RealismTest.cmd`](Run-RealismTest.cmd). It opens a textured ceramic vase, wood surface, and metal spheres with HDR reflections/ambient fill, soft shadows, 4× MSAA, and restrained SSAO. Imported model materials are preserved. Press **F1** for a clean view. Verify both 10 cm rulers after entering measured panel width. See [rendering and screen setup](docs/rendering.md) for panel size hints, quality comparison, assets, and limits.
+
+For **Billboard Illusion Mode**, double-click [`Run-BillboardTest.cmd`](Run-BillboardTest.cmd), or enable it in the settings. A recessed chamber, screen-plane frame, and protruding model share the existing head-tracked projection. Compare the frame on/off, start with animation off, and adjust physical height/depth. Turning it off restores the previous scene. The controller is reusable in other Unity projects without demo resources or URP assemblies. See the [billboard guide](docs/billboard-illusion.md) for API, setup, geometry, and limits.
 
 The Windows player lives at `Builds/HeadTrackedDemo/HeadTrackedDemo.exe` in the prepared checkout. Build output, the Python environment, and the Face Landmarker model are deliberately excluded from Git; a new clone needs the setup below.
 
@@ -136,7 +138,7 @@ Game code can read `EyePositionMeters`, `IsTracking`, `Confidence`, `SourceStatu
 
 ## Validation and limitations
 
-The automated suite checks screen corners, physical sightlines, actual Unity projection, scale, webcam extrinsics, rigid-pose conversion, gaze isolation, filtering, synthetic gaze calibration, measured Z correction, and tracker session lifetime. Scene tests check fixed model transforms, fixation/depth layouts, Python wire fields, stale packets, and calibration revision rejection. The current core run passed **35/35 EditMode**, **6/6 PlayMode**, and **10/10 Python** tests. Synthetic tests do not establish real webcam accuracy. A prior run with the optional Unity MediaPipe plugin installed passed its native webcam test. Run the Unity tests with Test Runner's EditMode and PlayMode tabs, and run the Python tests with:
+The automated suite checks screen corners, physical sightlines, actual Unity projection, scale, webcam extrinsics, rigid-pose conversion, gaze isolation, filtering, synthetic gaze calibration, measured Z correction, and tracker session lifetime. Scene tests check fixed model transforms, fixation/depth layouts, Python wire fields, stale packets, and calibration revision rejection. Billboard tests check source preservation, resizing/lifecycle, rendered frame occlusion, and restoration of a prior comparison. The latest reports passed **35/35 EditMode**, **9/9 PlayMode**, and **10/10 Python** tests. The two billboard package tests also passed in a separate Unity URP consumer project without demo assets. Synthetic tests do not establish real webcam accuracy. A prior run with the optional Unity MediaPipe plugin installed passed its native webcam test. Run the Unity tests with Test Runner's EditMode and PlayMode tabs, and run the Python tests with:
 
 ```powershell
 ./python_tracker/.venv/Scripts/python.exe -m unittest discover -s python_tracker -p 'test_*.py' -v

@@ -74,6 +74,11 @@ namespace HeadTracked.Demo
         private GameObject surfaceComparisons;
         private RenderQualitySettings renderQuality;
         private float reportedScreenWidth, reportedScreenHeight;
+        private BillboardIllusionController billboard;
+        private bool billboardActive;
+        private int billboardModel;
+        private readonly List<GameObject> billboardHiddenObjects = new List<GameObject>();
+        private readonly List<bool> billboardPreviousVisibility = new List<bool>();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureDemo()
@@ -125,6 +130,7 @@ namespace HeadTracked.Demo
             }
             notice = "Python bridge selected. Start python_tracker/tracker.py or switch to Unity MediaPipe.";
             if (Array.IndexOf(Environment.GetCommandLineArgs(), "--realism-test") >= 0) UseMaterialStudy();
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "--billboard-test") >= 0) UseBillboardIllusion();
         }
 
         private string GazeContext() => Screen.width + "x" + Screen.height + ":" + JsonUtility.ToJson(display.Calibration);
@@ -485,7 +491,106 @@ namespace HeadTracked.Demo
             showTrackingTest = false; showModelSettings = false;
         }
 
-        private void OnDestroy() => modelMaterials.Dispose();
+        private void OnDestroy()
+        {
+            if (billboard != null)
+            {
+                foreach (var material in new[] { billboard.frameMaterial, billboard.surroundMaterial,
+                    billboard.chamberMaterial, billboard.defaultContentMaterial })
+                    if (material != null) Destroy(material);
+                Destroy(billboard.gameObject);
+            }
+            modelMaterials.Dispose();
+        }
+
+        private void EnsureBillboard()
+        {
+            if (billboard != null) return;
+            billboard = new GameObject("Reusable Billboard Illusion Mode").AddComponent<BillboardIllusionController>();
+            billboard.enabled = false;
+            billboard.frameMaterial = MakeMaterial(new Color(.10f, .18f, .25f));
+            billboard.frameMaterial.SetFloat("_Metallic", .65f);
+            billboard.surroundMaterial = MakeMaterial(new Color(.003f, .004f, .006f));
+            billboard.chamberMaterial = MakeMaterial(new Color(.48f, .55f, .62f));
+            billboard.defaultContentMaterial = MakeMaterial(new Color(.78f, .43f, .12f));
+            billboard.defaultContentMaterial.SetFloat("_Metallic", .7f);
+            billboard.defaultContentMaterial.SetFloat("_Smoothness", .65f);
+            billboard.Configure(display);
+        }
+
+        public void UseBillboardIllusion()
+        {
+            if (billboardActive) return;
+            EnsureBillboard();
+            billboardHiddenObjects.Clear(); billboardPreviousVisibility.Clear();
+            foreach (var model in sceneModels)
+            {
+                RememberBillboardVisibility(model.root.gameObject);
+                if (model.plinth != null) RememberBillboardVisibility(model.plinth.gameObject);
+            }
+            RememberBillboardVisibility(roomFloor.gameObject);
+            RememberBillboardVisibility(backWall.gameObject);
+            RememberBillboardVisibility(surfaceComparisons);
+            billboardActive = true;
+            billboard.enabled = true;
+            SelectBillboardModel(billboardModel);
+            showModelSettings = showTrackingTest = false;
+            notice = "Billboard Illusion Mode: move your head; the frame and content use the same physical projection.";
+        }
+
+        private void RememberBillboardVisibility(GameObject item)
+        {
+            billboardHiddenObjects.Add(item); billboardPreviousVisibility.Add(item.activeSelf);
+            item.SetActive(false);
+        }
+
+        public void ExitBillboardIllusion()
+        {
+            if (!billboardActive) return;
+            billboard.enabled = false;
+            for (int i = 0; i < billboardHiddenObjects.Count; i++)
+                if (billboardHiddenObjects[i] != null) billboardHiddenObjects[i].SetActive(billboardPreviousVisibility[i]);
+            billboardHiddenObjects.Clear(); billboardPreviousVisibility.Clear();
+            billboardActive = false;
+        }
+
+        private void SelectBillboardModel(int selection)
+        {
+            billboardModel = Mathf.Clamp(selection, 0, 2);
+            billboard.SetContent(billboardModel == 0 ? null : sceneModels[billboardModel == 1 ? 0 : 1].root.gameObject);
+        }
+
+        private void DrawBillboardSettings()
+        {
+            bool enabled = GUILayout.Toggle(billboardActive, "Billboard Illusion Mode");
+            if (enabled != billboardActive) { if (enabled) UseBillboardIllusion(); else ExitBillboardIllusion(); }
+            if (!billboardActive) return;
+            var s = billboard.Settings;
+            GUILayout.Label("Fixed 3D chamber + screen-plane frame; tracking is unchanged.");
+            int selected = GUILayout.Toolbar(billboardModel, new[] { "Metal sphere", "Mini bear", "Mini chair" });
+            if (selected != billboardModel) SelectBillboardModel(selected);
+            s.showFrame = GUILayout.Toggle(s.showFrame, "Frame / dark surround (off for A/B comparison)");
+            s.showDepthReferences = GUILayout.Toggle(s.showDepthReferences, "Depth reference blocks");
+            s.animate = GUILayout.Toggle(s.animate, "Animate in/out (off for tracking stability test)");
+            GUILayout.Label($"Chamber depth: {s.boxDepth * 100f:F1} cm");
+            s.boxDepth = GUILayout.HorizontalSlider(s.boxDepth, .10f, .50f);
+            GUILayout.Label($"Model height: {s.contentHeight * 100f:F1} cm (miniature)");
+            s.contentHeight = GUILayout.HorizontalSlider(s.contentHeight, .03f, .12f);
+            GUILayout.Label($"Horizontal position: {s.horizontalOffsetFraction:F2} of opening width");
+            s.horizontalOffsetFraction = GUILayout.HorizontalSlider(s.horizontalOffsetFraction, -.4f, .4f);
+            if (s.animate)
+            {
+                GUILayout.Label($"Maximum protrusion: {s.animationProtrusion * 100f:F1} cm");
+                s.animationProtrusion = GUILayout.HorizontalSlider(s.animationProtrusion, .01f, .06f);
+            }
+            else
+            {
+                GUILayout.Label($"Model centre depth: {s.staticDepth * 100f:F1} cm (+ behind / - in front)");
+                s.staticDepth = GUILayout.HorizontalSlider(s.staticDepth, -.06f, .18f);
+            }
+            GUILayout.Label("F1: clean view. Apply/save screen size separately; physical bezel still clips.");
+            if (GUILayout.Button("Save billboard settings and mode")) SaveSettings();
+        }
 
         private static Transform MakeBox(string name, Vector3 position, Vector3 scale, Color color)
         {
@@ -553,6 +658,7 @@ namespace HeadTracked.Demo
 
         public void UseDepthPreset(bool deep)
         {
+            ExitBillboardIllusion();
             if (sceneModels.Count < 4) return;
             float[] depths = deep ? new[] { -.04f, .29f, .42f, -.18f } : new[] { -.025f, .10f, .16f, -.06f };
             for (int i = 0; i < depths.Length; i++) sceneModels[i].depthCm = (depths[i] * 100f).ToString("F1");
@@ -562,6 +668,7 @@ namespace HeadTracked.Demo
         // Compare a fixed target near eye level, independent of the floor and surrounding models.
         public void UseFixationTest(float depthMeters)
         {
+            ExitBillboardIllusion();
             if (sceneModels.Count < 3) return;
             var model = sceneModels[2];
             model.xCm = "0";
@@ -575,6 +682,7 @@ namespace HeadTracked.Demo
 
         public void UseDepthMotionTest()
         {
+            ExitBillboardIllusion();
             if (sceneModels.Count < 6) return;
             float d = Mathf.Max(.25f, display.Calibration.referenceEyeDistanceFromScreen);
             int[] indices = { 2, 3, 5 };
@@ -592,6 +700,7 @@ namespace HeadTracked.Demo
 
         private void SetDepthComparisonVisibility()
         {
+            ExitBillboardIllusion();
             materialStudyActive = false;
             if (surfaceComparisons != null) surfaceComparisons.SetActive(false);
             isolatePlant = false; depthComparisonActive = true;
@@ -605,6 +714,7 @@ namespace HeadTracked.Demo
 
         public void ResetModelLayout()
         {
+            ExitBillboardIllusion();
             foreach (var model in sceneModels)
             {
                 model.heightCm = (model.defaultHeight * 100f).ToString("F1");
@@ -622,6 +732,9 @@ namespace HeadTracked.Demo
             if (display == null) return;
             if (recording != null) FinishRecording();
             ResetModelLayout();
+            if (billboard != null)
+                JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(new BillboardIllusionSettings()), billboard.Settings);
+            billboardModel = 0;
             enhancedRendering = true;
             if (renderQuality != null) renderQuality.Apply(true);
             display.FreezeViewingDistance = false;
@@ -653,6 +766,7 @@ namespace HeadTracked.Demo
 
         public void SetPlantIsolation(bool isolate)
         {
+            ExitBillboardIllusion();
             materialStudyActive = false;
             if (surfaceComparisons != null) surfaceComparisons.SetActive(false);
             depthComparisonActive = false;
@@ -770,6 +884,14 @@ namespace HeadTracked.Demo
                 SetPlantIsolation(saved.isolatePlant);
                 if (saved.depthComparison) SetDepthComparisonVisibility();
                 if (saved.materialStudy) UseMaterialStudy();
+                if (saved.billboardSettings != null)
+                {
+                    EnsureBillboard();
+                    JsonUtility.FromJsonOverwrite(JsonUtility.ToJson(saved.billboardSettings), billboard.Settings);
+                    billboard.Settings.Validate();
+                    billboardModel = Mathf.Clamp(saved.billboardModel, 0, 2);
+                }
+                if (saved.billboardMode) UseBillboardIllusion();
             }
             catch (Exception ex) { notice = "Could not load model layout: " + ex.Message; }
         }
@@ -858,7 +980,9 @@ namespace HeadTracked.Demo
                 var path = Path.Combine(Application.persistentDataPath, "display_calibration.json");
                 File.WriteAllText(path, JsonUtility.ToJson(display.Calibration, true));
                 var layout = new ModelLayoutFile { models = new ModelSizeAndDepth[sceneModels.Count], isolatePlant = isolatePlant,
-                    depthComparison = depthComparisonActive, materialStudy = materialStudyActive };
+                    depthComparison = depthComparisonActive, materialStudy = materialStudyActive,
+                    billboardMode = billboardActive, billboardModel = billboardModel,
+                    billboardSettings = billboard != null ? billboard.Settings : null };
                 for (int i = 0; i < sceneModels.Count; i++)
                     layout.models[i] = new ModelSizeAndDepth { height = sceneModels[i].height, depth = sceneModels[i].depth,
                         x = sceneModels[i].x, y = sceneModels[i].supportY + sceneModels[i].height * .5f, hasPosition = true };
@@ -999,6 +1123,7 @@ namespace HeadTracked.Demo
 
         private void DrawModelSettings()
         {
+            if (billboardActive) return;
             showModelSettings = GUILayout.Toggle(showModelSettings, "Model size and depth / compare physical layouts");
             if (!showModelSettings) return;
             GUILayout.Label("Height is the real object height. Depth: + behind, - in front.");
@@ -1080,6 +1205,7 @@ namespace HeadTracked.Demo
             GUILayout.Label($"Tracking: {(display.IsTracking ? "FACE FOUND" : "NO FACE")} | {display.SourceStatus}");
             GUILayout.Label($"Eye (m): {display.EyePositionMeters.ToString("F3")}  Confidence: {display.Confidence:F2}");
             GUILayout.Label($"Display: {Screen.width} x {Screen.height} px");
+            DrawBillboardSettings();
             if (GUILayout.Button("Realistic material comparison")) UseMaterialStudy();
             bool quality = GUILayout.Toggle(enhancedRendering, "Enhanced rendering: 4x MSAA / soft shadows / SSAO");
             if (quality != enhancedRendering)
@@ -1088,7 +1214,7 @@ namespace HeadTracked.Demo
                 if (renderQuality != null) renderQuality.Apply(quality);
             }
             GUILayout.Label("F1 hides all panels for judging the surfaces.");
-            if (materialStudyActive) GUILayout.Label("40 cm ceramic vase, wood surface, brass and steel spheres.");
+            if (materialStudyActive && !billboardActive) GUILayout.Label("40 cm ceramic vase, wood surface, brass and steel spheres.");
             var c = display.Calibration;
             float physicalAspect = c.screenWidth / c.screenHeight;
             float imageAspect = (float)Screen.width / Screen.height;
@@ -1203,6 +1329,9 @@ namespace HeadTracked.Demo
             public bool isolatePlant;
             public bool depthComparison;
             public bool materialStudy;
+            public bool billboardMode;
+            public int billboardModel;
+            public BillboardIllusionSettings billboardSettings;
         }
 
         [Serializable]

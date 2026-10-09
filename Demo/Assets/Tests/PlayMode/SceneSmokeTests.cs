@@ -14,6 +14,53 @@ namespace HeadTracked.Demo.Tests
     public sealed class SceneSmokeTests
     {
         [UnityTest]
+        public IEnumerator BillboardModeRestoresPriorComparisonAndUsesTheExistingTrackedCamera()
+        {
+            yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
+            yield return null;
+            var demo = Object.FindFirstObjectByType<DemoBootstrap>();
+            var display = Camera.main.GetComponent<HeadTrackedDisplay>();
+            var camera = Camera.main;
+            var source = Object.FindFirstObjectByType<PythonBridgeSource>();
+            string calibration = JsonUtility.ToJson(display.Calibration);
+            demo.UseFixationTest(.05f);
+            var plant = GameObject.Find("Plant, behind chair");
+            Vector3 position = plant.transform.position;
+            demo.UseBillboardIllusion();
+            yield return null;
+            var billboard = Object.FindFirstObjectByType<BillboardIllusionController>();
+            Assert.That(billboard.enabled, Is.True);
+            Assert.That(plant.activeSelf, Is.False);
+            Assert.That(Camera.main, Is.SameAs(camera));
+            Assert.That(Object.FindFirstObjectByType<PythonBridgeSource>(), Is.SameAs(source));
+            Assert.That(JsonUtility.ToJson(display.Calibration), Is.EqualTo(calibration));
+            demo.ExitBillboardIllusion();
+            Assert.That(plant.activeSelf, Is.True);
+            Assert.That(plant.transform.position, Is.EqualTo(position));
+            Assert.That(GameObject.Find("Floor"), Is.Null, "Prior isolated layout must remain isolated.");
+            Assert.That(billboard.RigRoot.gameObject.activeSelf, Is.False);
+            demo.UseBillboardIllusion();
+            string path = System.Environment.GetEnvironmentVariable("HEADTRACK_CAPTURE_BILLBOARD");
+            if (!string.IsNullOrEmpty(path))
+            {
+                var target = new RenderTexture(1280, 800, 24) { antiAliasing = 4 };
+                var image = new Texture2D(1280, 800, TextureFormat.RGB24, false);
+                var old = RenderTexture.active;
+                try
+                {
+                    camera.targetTexture = target;
+                    camera.Render(); RenderTexture.active = target;
+                    image.ReadPixels(new Rect(0, 0, 1280, 800), 0, 0); image.Apply();
+                    File.WriteAllBytes(path, image.EncodeToPNG());
+                }
+                finally { camera.targetTexture = null; RenderTexture.active = old; Object.Destroy(image); Object.Destroy(target); }
+            }
+            demo.ResetModelLayout();
+            Assert.That(billboard.enabled, Is.False);
+            Assert.That(GameObject.Find("Chair, distant"), Is.Not.Null);
+        }
+
+        [UnityTest]
         public IEnumerator RealismStudyUsesPbrMapsAndPreservesSubmeshMaterials()
         {
             yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
