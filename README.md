@@ -30,6 +30,14 @@ Double-click [Run-HeadTrackedDemo.cmd](Run-HeadTrackedDemo.cmd) on a prepared Wi
 
 **Alt+F4** closes the player and stops its tracker. A heartbeat releases the webcam if the launcher disappears. Builds, Python environments and the downloaded face model are excluded from Git; a new clone needs the setup below.
 
+The same entry point can launch another Unity project using `-UnityProject <directory> -PlayerPath <exe> -TrackerRoot <technology checkout or python_tracker directory>`. Relative paths are resolved from the current shell directory. For example:
+
+```powershell
+./Run-HeadTrackedDemo.cmd -UnityProject "../newyork_3d/ManhattanViewer" -PlayerPath "../newyork_3d/Builds/ManhattanViewer/ManhattanViewer.exe" -TrackerRoot "."
+```
+
+Repeat those target arguments with `-Stop` to stop that player and its managed tracker. Target company/product names determine the persistent calibration path; player executable paths determine process matching, mutexes, heartbeat files and logs. `Player.log` and tracker logs are written beside the executable. Other targets and manually started trackers are not terminated. See [launcher details](docs/launcher.md).
+
 First launch asks only for **visible screen width, height and eye-to-screen distance**. Measure these values; the examples are not hardware measurements. Sit at the entered distance. Starting captures a reference if a face is available; otherwise capture it later under Settings.
 
 The fixed comparison scene contains a stationary 16 cm ceramic vase, wood floor and billboard chamber. All three switches operate on that same scene:
@@ -111,6 +119,8 @@ Add `HeadTrackedDisplay` to a camera, assign a screen-center Transform and a `He
 
 Optional `BillboardIllusionController.EffectEnabled` hides dressing while retaining content. Disabling the component hides its entire rig. Supply materials compatible with your render pipeline. See the [package README](Packages/com.headtracked.display/README.md).
 
+For a moving large world, `ScreenWindowFrame` supplies only four screen-edge strips with a borrowed material and an independent `EffectEnabled` toggle. The [moving-world guide](docs/screen-window-frame.md) shows the observer rig and physical calibration setup.
+
 ## Geometry and validation
 
 The monitor is a fixed physical rectangle through which a fixed virtual scene is rendered. The tracking system estimates the observer's position; the renderer calculates which part of that scene should be visible through the rectangle.
@@ -173,6 +183,7 @@ This depth-dependent change comes from the viewing geometry. It is not an extra 
 unity test Demo --mode EditMode --output Builds/editmode.xml
 unity test Demo --mode PlayMode --output Builds/playmode.xml
 ./python_tracker/.venv/Scripts/python.exe -m unittest discover -s python_tracker -p 'test_*.py' -v
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/test_launcher.ps1
 ```
 
 Tests cover projection, calibration, filtering, protocol/session lifetime, scene lifecycle and all eight primary switch combinations. They check retained content/transforms, calibration, render quality and continued measurements while the viewpoint is held.

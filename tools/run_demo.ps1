@@ -2,32 +2,32 @@ param(
     [ValidateRange(0, 20)]
     [int]$Camera = 0,
     [switch]$NoTracker,
+    [string]$UnityProject,
+    [string]$PlayerPath,
+    [string]$PlayerArguments,
+    [string]$TrackerRoot,
     [string]$CalibrationDirectory,
     [switch]$Stop
 )
 
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$gameExe = Join-Path $projectRoot 'Builds\HeadTrackedDemo\HeadTrackedDemo.exe'
-$pythonExe = Join-Path $projectRoot 'python_tracker\.venv\Scripts\python.exe'
-$trackerScript = Join-Path $projectRoot 'python_tracker\tracker.py'
-$modelFile = Join-Path $projectRoot 'python_tracker\face_landmarker.task'
-$outputLog = Join-Path $projectRoot 'Builds\HeadTrackedDemo\tracker-output.log'
-$errorLog = Join-Path $projectRoot 'Builds\HeadTrackedDemo\tracker-error.log'
-if (-not $CalibrationDirectory) {
-    # Follow the checked-in Unity player identity, instead of a particular developer's PC.
-    $settings = Get-Content -LiteralPath (Join-Path $projectRoot 'Demo\ProjectSettings\ProjectSettings.asset') -Raw
-    $company = [regex]::Match($settings, '(?m)^\s*companyName:\s*(.+)$').Groups[1].Value.Trim()
-    $product = [regex]::Match($settings, '(?m)^\s*productName:\s*(.+)$').Groups[1].Value.Trim()
-    if (-not $company -or -not $product) { throw 'Unity companyName/productName are missing. Pass -CalibrationDirectory explicitly.' }
-    $CalibrationDirectory = Join-Path $env:USERPROFILE "AppData\LocalLow\$company\$product"
-}
-$calibrationFile = Join-Path $CalibrationDirectory 'tracker_runtime_calibration.json'
+. (Join-Path $PSScriptRoot 'launcher_common.ps1')
+$target = Get-LauncherTarget -TechnologyRoot $projectRoot -UnityProject $UnityProject -PlayerPath $PlayerPath `
+    -TrackerRoot $TrackerRoot -CalibrationDirectory $CalibrationDirectory
+$gameExe = $target.PlayerPath
+$pythonExe = $target.PythonPath
+$trackerScript = $target.TrackerScript
+$modelFile = $target.ModelPath
+$outputLog = $target.TrackerOutputLog
+$errorLog = $target.TrackerErrorLog
+$calibrationFile = $target.CalibrationFile
+$CalibrationDirectory = $target.CalibrationDirectory
 
 function Get-ProjectTrackers {
     Get-CimInstance Win32_Process | Where-Object {
         $_.Name -in @('python.exe', 'pythonw.exe') -and
-        $_.CommandLine -and $_.CommandLine.Contains($trackerScript)
+        (Test-TargetTrackerCommand $_.CommandLine $target)
     }
 }
 
@@ -55,8 +55,9 @@ function Update-PanelHint {
     catch { Write-Warning 'Panel dimensions could not be read; measure the screen width manually.' }
 }
 
-$players = @(Get-CimInstance Win32_Process -Filter "Name = 'HeadTrackedDemo.exe'" |
-    Where-Object { $_.ExecutablePath -eq $gameExe })
+$players = @(Get-CimInstance Win32_Process | Where-Object {
+    $_.Name -eq $target.PlayerProcessName -and (Test-SameLauncherPath $_.ExecutablePath $gameExe)
+})
 if ($Stop) {
     foreach ($player in $players) {
         $running = Get-Process -Id $player.ProcessId -ErrorAction SilentlyContinue
@@ -67,20 +68,22 @@ if ($Stop) {
         }
     }
     Stop-ProjectTrackers
-    Write-Host 'Demo and its webcam tracker stopped.'
+    Write-Host "$($target.Product) and its webcam tracker stopped."
     exit 0
 }
 
-$mutex = New-Object System.Threading.Mutex($false, 'Local\HeadTrackedDisplayDemoLauncher')
+$mutex = New-Object System.Threading.Mutex($false, $target.MutexName)
 $ownsMutex = $false
 $tracker = $null
 $game = $null
 $lifetimeFile = $null
+$calibrationEnvironmentChanged = $false
+$previousCalibrationEnvironment = [Environment]::GetEnvironmentVariable('HEADTRACKED_CALIBRATION_DIRECTORY', 'Process')
 try {
     try { $ownsMutex = $mutex.WaitOne(0) }
     catch [System.Threading.AbandonedMutexException] { $ownsMutex = $true }
     if (-not $ownsMutex -or $players.Count -gt 0) {
-        throw 'The demo is already running. Close it with Alt+F4, or run Run-HeadTrackedDemo.cmd -Stop, before launching again.'
+        throw "$($target.Product) is already running. Close it with Alt+F4, or use the same target arguments with -Stop."
     }
     $requiredFiles = @($gameExe)
     if (-not $NoTracker) { $requiredFiles += @($pythonExe, $trackerScript, $modelFile) }
@@ -90,26 +93,36 @@ try {
         }
     }
     Stop-ProjectTrackers
+    New-Item -ItemType Directory -Path $target.LogDirectory -Force | Out-Null
     Update-PanelHint
     $lifetimeFile = Join-Path (Split-Path -Parent $gameExe) ('tracker-session-' + [guid]::NewGuid().ToString('N') + '.heartbeat')
     [System.IO.File]::WriteAllText($lifetimeFile, '')
 
-    if ($NoTracker) { Write-Host 'Starting Unity demo without a webcam tracker. Close the game with Alt+F4.' }
-    else { Write-Host "Starting Unity demo and webcam $Camera. Close the game with Alt+F4." }
+    if ($NoTracker) { Write-Host "Starting $($target.Product) without a webcam tracker. Close the game with Alt+F4." }
+    else { Write-Host "Starting $($target.Product) and webcam $Camera. Close the game with Alt+F4." }
+    [Environment]::SetEnvironmentVariable('HEADTRACKED_CALIBRATION_DIRECTORY', $CalibrationDirectory, 'Process')
+    $calibrationEnvironmentChanged = $true
     $startGame = @{
         FilePath = $gameExe; WorkingDirectory = (Split-Path -Parent $gameExe)
         WindowStyle = 'Normal'; PassThru = $true
+        # Start-Process sends this to the executable directly; it is never evaluated as shell code.
+        ArgumentList = Get-LauncherPlayerArguments -Target $target -PlayerArguments $PlayerArguments -NoTracker:$NoTracker
     }
     $game = Start-Process @startGame
     Start-Sleep -Milliseconds 750
     $game.Refresh()
-    if ($game.HasExited) { throw "Unity exited at startup (code $($game.ExitCode)). Check Player.log in $CalibrationDirectory." }
+    if ($game.HasExited) { throw "Unity exited at startup (code $($game.ExitCode)). Check $($target.PlayerLog)." }
 
     if (-not $NoTracker) { $tracker = Start-Process -FilePath $pythonExe `
         -ArgumentList @('-u', ('"' + $trackerScript + '"'), '--camera', [string]$Camera,
+            '--model', ('"' + $modelFile + '"'),
             '--calibration-file', ('"' + $calibrationFile + '"'), '--lifetime-file', ('"' + $lifetimeFile + '"')) `
-        -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru `
+        -WorkingDirectory $target.TrackerDirectory -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput $outputLog -RedirectStandardError $errorLog }
+
+    # Child processes inherit their own copy. Restore only this launcher's process environment.
+    [Environment]::SetEnvironmentVariable('HEADTRACKED_CALIBRATION_DIRECTORY', $previousCalibrationEnvironment, 'Process')
+    $calibrationEnvironmentChanged = $false
 
     while (-not $game.HasExited) {
         [System.IO.File]::WriteAllText($lifetimeFile, '')
@@ -121,9 +134,12 @@ try {
         Start-Sleep -Milliseconds 250
         $game.Refresh()
     }
-    if ($game.ExitCode -ne 0) { throw "Unity exited with code $($game.ExitCode). Check Player.log in $CalibrationDirectory." }
+    if ($game.ExitCode -ne 0) { throw "Unity exited with code $($game.ExitCode). Check $($target.PlayerLog)." }
 }
 finally {
+    if ($calibrationEnvironmentChanged) {
+        [Environment]::SetEnvironmentVariable('HEADTRACKED_CALIBRATION_DIRECTORY', $previousCalibrationEnvironment, 'Process')
+    }
     # Only the launcher that acquired the mutex owns these resources.
     if ($ownsMutex -and $lifetimeFile) {
         Remove-Item -LiteralPath $lifetimeFile -ErrorAction SilentlyContinue
@@ -132,7 +148,7 @@ finally {
             $game.Refresh()
             if (-not $game.HasExited) { Stop-Process -Id $game.Id -ErrorAction SilentlyContinue }
         }
-        if ($NoTracker) { Write-Host 'Demo stopped.' }
+        if ($NoTracker) { Write-Host "$($target.Product) stopped." }
         else { Write-Host "Webcam tracker stopped. Logs: $outputLog and $errorLog" }
     }
     if ($ownsMutex) { $mutex.ReleaseMutex() }

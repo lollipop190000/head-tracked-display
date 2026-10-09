@@ -1,6 +1,6 @@
 {
   "name": "com.headtracked.display",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "displayName": "Head Tracked Display",
   "description": "Single-viewer off-axis projection for a physical monitor, interchangeable face trackers, and optional billboard illusion scene geometry.",
   "unity": "6000.3",

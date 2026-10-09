@@ -29,6 +29,12 @@ namespace HeadTracked.Display
 
         public override string Status => status;
         public int Port => port;
+        public const string CalibrationDirectoryEnvironmentVariable = "HEADTRACKED_CALIBRATION_DIRECTORY";
+        /// <summary>Companion tracker directory; the launcher supplies an optional process-scoped override.</summary>
+        public static string RuntimeCalibrationDirectory => ResolveCalibrationDirectory(
+            Environment.GetEnvironmentVariable(CalibrationDirectoryEnvironmentVariable), Application.persistentDataPath);
+        public static string ResolveCalibrationDirectory(string overrideDirectory, string fallbackDirectory) =>
+            string.IsNullOrWhiteSpace(overrideDirectory) ? fallbackDirectory : Path.GetFullPath(overrideDirectory);
 
         public void SetPort(int value)
         {
@@ -154,7 +160,9 @@ namespace HeadTracked.Display
             camera.revision = calibrationRevision + 1;
             try
             {
-                File.WriteAllText(Path.Combine(Application.persistentDataPath, "tracker_runtime_calibration.json"),
+                string directory = RuntimeCalibrationDirectory;
+                Directory.CreateDirectory(directory);
+                File.WriteAllText(Path.Combine(directory, "tracker_runtime_calibration.json"),
                     JsonUtility.ToJson(camera));
                 calibrationRevision = camera.revision;
                 latest.poseValid = latest.gazeValid = false;

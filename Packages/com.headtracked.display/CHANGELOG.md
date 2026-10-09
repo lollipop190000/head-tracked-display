@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.0
+
+- Add `ScreenWindowFrame`: four collider-free screen-edge strips that follow physical calibration, without creating a chamber, cloning content or changing projection. Consumers supply their own pipeline-compatible material.
+- Add PlayMode frame visibility round-trip, screen resize/reparenting, invalid calibration, material ownership and cleanup regression tests.
+- Generalize the one Windows launcher with project/player/tracker/calibration paths and target-scoped process, heartbeat, mutex and log handling.
+- Honor a process-scoped `HEADTRACKED_CALIBRATION_DIRECTORY` override in the Python bridge and launcher. Forward `--no-tracker` to consuming players and preserve quoted native player arguments.
+
 ## 0.4.2
 
 - Declare the built-in Physics and JSON serialization modules directly. Standalone package installs no longer depend on URP or the test framework to make `Collider` and `JsonUtility` available.
