@@ -2,6 +2,10 @@
 
 A reusable Unity package that makes a normal monitor behave like a window into a fixed 3D scene. A webcam estimates one viewer's eye position; an off-axis projection uses the measured screen rectangle. Ordinary models keep their transforms and materials. This is a **single-viewer, monoscopic** display.
 
+![Unity demo: a ceramic vase extending in front of a recessed chamber with a wood floor](docs/demo-comparison.png)
+
+*Unity render of the stationary comparison scene, with billboard dressing and surface detail enabled. The model stays fixed; head tracking changes the viewing position.*
+
 ## Repository
 
 | Path | Responsibility |
@@ -87,6 +91,12 @@ Both providers implement `HeadObservationSource` and use the same projection.
 
 Python supports calibrated rigid face pose, angles, iris features and timing. Unity-native tracking uses the yaw-compensated eye-span estimator. Head orientation and gaze do not rotate the camera or models.
 
+The Python path detects facial landmarks, then fits **20 landmarks** to a canonical 3D face using OpenCV PnP and refinement. The face model is scaled by the entered eye separation/IPD. Applying the fitted rotation and translation to its eye-corner midpoint gives a camera-space estimate of the viewer's eye position. Head rotation contributes to this position estimate; the resulting head angles are not copied to the render camera. The midpoint is an anatomical proxy for one shared viewpoint, not a measurement of each eye's optical centre. See [the pose estimator](python_tracker/pose_estimator.py).
+
+The basic/native path estimates distance from apparent eye spacing. Under a pinhole approximation, `pixel eye span = focal length in pixels * physical eye separation / camera depth`; face orientation compensates for the narrowing caused by yaw. A reference capture at a measured distance supplies the scale, or calibrated intrinsics can supply focal length and lens distortion. Before a reference or precise calibration is available, this path uses the configured reference distance and assumed webcam FOV. A single webcam does not automatically recover exact physical dimensions. See [eye estimation](Packages/com.headtracked.display/Runtime/EyePoseEstimator.cs).
+
+Camera-space coordinates are then converted to **screen-local metres** using the measured webcam position, rotation and mirror setting. This matters because the webcam lens is usually above and in front of the screen centre. The Python bridge also publishes the active camera parameters back to the tracker; fits from a different calibration revision are rejected until it reloads them.
+
 Measure screen size, webcam lens position, viewing distance and eye separation. Capture a reference at the measured distance, then **Save physical calibration**. Check both 10 cm rulers. Optional camera intrinsics and two-distance Z calibration are covered in the [tracking guide](docs/tracking-test.md).
 
 ## Use in another Unity project
@@ -103,15 +113,61 @@ Optional `BillboardIllusionController.EffectEnabled` hides dressing while retain
 
 ## Geometry and validation
 
-For eye `E = (ex, ey, -d)` and model point `P = (px, py, z)`, the ray crosses the physical screen at:
+The monitor is a fixed physical rectangle through which a fixed virtual scene is rendered. The tracking system estimates the observer's position; the renderer calculates which part of that scene should be visible through the rectangle.
+
+```mermaid
+flowchart LR
+    A[Webcam landmarks] --> B[Eye in screen-local metres]
+    B --> C[Filtered off-axis projection]
+    C --> D[Rendered screen image]
+    E[Fixed meshes and materials] --> D
+```
+
+**Physical coordinate system.** The screen-centre Transform defines local `(0, 0, 0)`, with the visible panel on `Z = 0`. Local +X points right, +Y up and +Z behind the monitor, into the scene. All lengths are metres. The eye is in front of the screen at `E = (ex, ey, -d)`, where `d` is a positive eye-to-screen distance. A model point is `P = (px, py, z)`: positive `z` is behind the screen, while negative `z` places it between the screen and viewer. The physical screen width/height and webcam measurements connect these virtual coordinates to the real hardware.
+
+**Ray/screen intersection.** A visible model point must be drawn where the straight line from the eye to that point intersects the monitor. Writing the ray as `E + t(P - E)`, its Z coordinate reaches zero when `t = d / (d + z)`. Its screen position is therefore:
 
 ```text
 Sxy = Exy + [d / (d + z)] (Pxy - Exy)
 ```
 
-The camera translates but keeps the screen plane's orientation. Models stay fixed; a stationary eye does not produce head-driven model rotation.
+Here, `Sxy` is a physical position on the panel, measured from its centre. Converting it to viewport coordinates gives `u = 0.5 + Sx / screenWidth` and `v = 0.5 + Sy / screenHeight`. Points outside that rectangle are clipped by the rendered image; the real monitor bezel still limits the illusion.
 
-Use Unity Test Runner, or:
+**Why the projection is off-axis.** A usual symmetric camera frustum centres its view on the camera's forward axis. When the viewer moves sideways, the monitor remains in place and is no longer centred in that view. [OffAxisProjection](Packages/com.headtracked.display/Runtime/OffAxisProjection.cs) instead derives the frustum from the eye and the four fixed screen edges. For width `W`, height `H` and near-clip distance `n`, its near-plane bounds are:
+
+```text
+left   = (-W/2 - ex) * n/d
+right  = ( W/2 - ex) * n/d
+bottom = (-H/2 - ey) * n/d
+top    = ( H/2 - ey) * n/d
+```
+
+These bounds produce an asymmetric perspective matrix, keeping the physical screen corners mapped to the corresponding image corners. Each render update translates the camera to the eye position and keeps its orientation aligned with the screen plane. The camera does not turn to look at a model, and the model does not rotate with the head. A pure head turn with an unchanged eye position produces no geometric view change; actual eye movement around the neck pivot can still change the view. See [the display component](Packages/com.headtracked.display/Runtime/HeadTrackedDisplay.cs).
+
+**Expected motion parallax.** With a fixed model point and constant viewing distance, lateral eye movement produces:
+
+```text
+deltaScreen = [z / (d + z)] * deltaEye
+```
+
+At a **60 cm viewing distance**, a **10 cm eye movement to the right** gives these screen displacements:
+
+| Model point depth | Screen displacement | Direction |
+| --- | --- | --- |
+| On the screen plane, 0 cm | 0 cm | Fixed screen position. |
+| 5 cm behind | +0.77 cm | Right. |
+| 30 cm behind | +3.33 cm | Right. |
+| 6 cm in front | -1.11 cm | Left. |
+
+This depth-dependent change comes from the viewing geometry. It is not an extra head-motion multiplier. Bringing a target closer to the screen plane reduces its screen displacement. Looking at a fixed target does not imply that its screen pixels should stay fixed as the observer moves.
+
+**Forward/back movement and size.** An upright segment of physical height `Hobject`, with both endpoints at depth `z`, has projected screen height `d * Hobject / (d + z)`. A behind-screen object's screen height can decrease when the viewer approaches, even while its visual angle increases: the monitor itself occupies more of the viewer's visual field. A volumetric mesh spans multiple depths, so this segment formula is an approximation for its overall silhouette. Foreground geometry must stay beyond the camera's near plane, with `d + z > n`. See [physical scale and visual angle](docs/physical-scale.md).
+
+**Separate geometry from presentation.** Billboard dressing adds a frame at the screen plane, a recessed chamber and depth references. Ordinary depth testing lets content behind the frame be occluded and protruding content cover it. It uses the same projection, without an additional image warp. Surface detail adds textures, normal maps and material finish to the same meshes. These are visual depth cues; they do not change the tracked viewpoint or model placement. Head tracking OFF holds the currently rendered viewpoint while fresh measurements and filtering continue. This lets the three switches compare their effects in one composition.
+
+**Filtering and timing.** The default One Euro filter smooths the eye estimate once per new observation. Its cutoff increases with movement speed to reduce lag during motion while smoothing more at rest. Python and Unity keep the latest frame/packet rather than an accumulating work queue. Rendering can run faster than the tracker, but extra rendered frames do not create new measurements. With tracking enabled, short face losses briefly hold the view, followed by a gradual return to neutral. Reported result age covers software processing and waiting after camera delivery; it excludes exposure, earlier driver buffering and monitor presentation latency.
+
+**Validation.** Use Unity Test Runner, or:
 
 ```powershell
 unity test Demo --mode EditMode --output Builds/editmode.xml
