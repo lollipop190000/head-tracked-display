@@ -32,11 +32,18 @@ namespace HeadTracked.Display
         private Material fallbackFrame, fallbackSurround, fallbackChamber, fallbackContent;
         private Vector4 lastOpening, lastConstruction;
         private bool geometryDirty = true, materialsDirty = true, lastShowFrame, lastShowReferences;
+        [SerializeField] private bool effectEnabled = true;
         private Material lastFrameMaterial, lastSurroundMaterial, lastChamberMaterial, lastContentMaterial;
 
         public BillboardIllusionSettings Settings => settings;
         public Transform RigRoot => root;
         public GameObject ContentInstance => content;
+        /// <summary>Toggle scene dressing without replacing, moving, or hiding the content.</summary>
+        public bool EffectEnabled
+        {
+            get => effectEnabled;
+            set { effectEnabled = value; Refresh(); }
+        }
 
         /// <summary>Use an existing display and optional ordinary model. Null uses an 8 cm default sphere.</summary>
         public void Configure(HeadTrackedDisplay targetDisplay, GameObject prefab = null)
@@ -119,6 +126,8 @@ namespace HeadTracked.Display
             }
             if (content == null || builtPrefab != contentPrefab) BuildContent();
             if (content != null) PositionContent(w, h);
+            frameRoot.gameObject.SetActive(effectEnabled && settings.showFrame);
+            chamberRoot.gameObject.SetActive(effectEnabled);
         }
 
         private void LateUpdate() => Refresh();

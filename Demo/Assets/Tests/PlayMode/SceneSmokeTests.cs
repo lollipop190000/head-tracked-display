@@ -19,6 +19,7 @@ namespace HeadTracked.Demo.Tests
         {
             yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
             yield return null;
+            Object.FindFirstObjectByType<DemoBootstrap>().ResetModelLayout();
             var demo = Object.FindFirstObjectByType<DemoBootstrap>();
             var display = Camera.main.GetComponent<HeadTrackedDisplay>();
             var camera = Camera.main;
@@ -68,6 +69,7 @@ namespace HeadTracked.Demo.Tests
         {
             yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
             yield return null;
+            Object.FindFirstObjectByType<DemoBootstrap>().ResetModelLayout();
             var demo = Object.FindFirstObjectByType<DemoBootstrap>();
             var camera = Camera.main;
             var display = camera.GetComponent<HeadTrackedDisplay>();
@@ -133,6 +135,7 @@ namespace HeadTracked.Demo.Tests
         {
             yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
             yield return null;
+            Object.FindFirstObjectByType<DemoBootstrap>().ResetModelLayout();
             var demo = Object.FindFirstObjectByType<DemoBootstrap>();
             var original = Resources.Load<GameObject>("Models/pottedPlant").GetComponentsInChildren<Renderer>();
             var placed = GameObject.Find("Plant, behind chair").GetComponentsInChildren<Renderer>();
@@ -192,6 +195,7 @@ namespace HeadTracked.Demo.Tests
         {
             yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
             yield return null;
+            Object.FindFirstObjectByType<DemoBootstrap>().ResetModelLayout();
             var model = GameObject.Find("Plant, in front of screen").transform;
             var renderer = model.GetComponentInChildren<Renderer>();
             Vector3 scale = model.localScale;
@@ -216,6 +220,7 @@ namespace HeadTracked.Demo.Tests
         {
             yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
             yield return null;
+            Object.FindFirstObjectByType<DemoBootstrap>().ResetModelLayout();
 
             var front = GameObject.Find("Bear, in front of screen");
             var protruding = GameObject.Find("Plant, in front of screen");
@@ -279,6 +284,7 @@ namespace HeadTracked.Demo.Tests
         {
             yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
             yield return null;
+            Object.FindFirstObjectByType<DemoBootstrap>().ResetModelLayout();
             var demo = Object.FindFirstObjectByType<DemoBootstrap>();
             var plant = GameObject.Find("Plant, behind chair");
             var chair = GameObject.Find("Chair, distant");
@@ -328,6 +334,7 @@ namespace HeadTracked.Demo.Tests
         {
             yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
             yield return null;
+            Object.FindFirstObjectByType<DemoBootstrap>().ResetModelLayout();
             var demo = Object.FindFirstObjectByType<DemoBootstrap>();
             var plants = new[] { GameObject.Find("Plant, behind chair"), GameObject.Find("Plant, in front of screen"),
                 GameObject.Find("Plant, distant") };
@@ -356,6 +363,7 @@ namespace HeadTracked.Demo.Tests
         {
             yield return SceneManager.LoadSceneAsync("HeadTrackedDemo", LoadSceneMode.Single);
             yield return null;
+            Object.FindFirstObjectByType<DemoBootstrap>().ResetModelLayout();
             var source = Object.FindFirstObjectByType<PythonBridgeSource>();
             var display = Camera.main.GetComponent<HeadTrackedDisplay>();
             display.Calibration.webcamPosition = Vector3.zero;

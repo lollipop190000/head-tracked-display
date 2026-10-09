@@ -43,6 +43,16 @@ namespace HeadTracked.Display.Tests
                 Assert.That(model.transform.localScale, Is.EqualTo(originalScale));
                 Assert.That(JsonUtility.ToJson(display.Calibration), Is.EqualTo(before));
                 Vector3 fixedContentPosition = controller.ContentInstance.transform.position;
+                var fixedContent = controller.ContentInstance;
+                controller.EffectEnabled = false;
+                Assert.That(controller.ContentInstance, Is.SameAs(fixedContent));
+                Assert.That(controller.ContentInstance.activeInHierarchy, Is.True);
+                Assert.That(controller.ContentInstance.transform.position, Is.EqualTo(fixedContentPosition));
+                Assert.That(controller.RigRoot.Find("Recessed chamber").gameObject.activeSelf, Is.False);
+                Assert.That(controller.RigRoot.Find("Screen-plane frame and matte surround").gameObject.activeSelf, Is.False);
+                controller.EffectEnabled = true;
+                Assert.That(controller.RigRoot.Find("Recessed chamber").gameObject.activeSelf, Is.True);
+                Assert.That(controller.ContentInstance, Is.SameAs(fixedContent));
                 cameraObject.transform.position += new Vector3(.1f, .03f, -.05f);
                 yield return null;
                 Assert.That(Vector3.Distance(controller.ContentInstance.transform.position, fixedContentPosition), Is.LessThan(1e-6));

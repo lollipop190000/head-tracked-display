@@ -2,15 +2,15 @@
 
 ## Run the comparison
 
-Close the previous demo and double-click **Run-RealismTest.cmd**. The physical-window view shows a 40 cm ceramic vase, two 8 cm metal spheres, and textured wood. Press **F1** to hide/show all diagnostic panels. **Enhanced rendering** compares MSAA, soft shadows, and SSAO without changing tracking or placement.
+Run **Run-HeadTrackedDemo.cmd**. The default fixed scene already contains a textured vase and wood floor. Compare **Surface detail ON/OFF** there: plain matte variants retain geometry, placement, lighting and render quality. F1 hides the UI.
 
-The vase is 85 cm behind the screen; spheres are 80/90 cm behind it. Their bottoms rest on the wood. **Restore all models and original positions** returns to the full demo. **Save calibration** persists the layout.
+For the larger legacy study, choose **Settings > Layouts > Vase / wood / metal surface study**. Its 40 cm vase is 85 cm behind the screen; 8 cm brass/steel spheres are at 80/90 cm. **Appearance** exposes quality controls for this experiment, separately from surface detail.
 
-The top **Reset demo to defaults** button restores and saves the full original model layout, enhanced rendering, adaptive filter defaults, and XYZ motion. It keeps measured screen dimensions and completed camera/distance/gaze calibration. It also cancels unfinished captures and closes diagnostic panels. **F1** restores the buttons if hidden. A comparison-specific launcher will still select its comparison on the next launch; use **Run-HeadTrackedDemo.cmd** to reopen the saved full layout.
+**Reset comparison defaults** restores the stationary comparison and controls, keeping physical and completed distance/gaze calibration. **Save physical calibration** does not save a layout. Save/load experiments explicitly in Layouts.
 
 ## Match the physical display first
 
-Open the top **Display size: … / change** button. Enter the visible panel width and height in centimetres and click **Apply and save**. Both measurements are editable when **Calculate height from width and render resolution** is off. Cancel leaves the applied size unchanged. Saved dimensions load on the next launch and survive **Reset demo to defaults**.
+Open **Settings > Calibration > Change measured display size**. Enter the visible panel width and height in centimetres and click **Apply and save**. Both measurements are editable when **Calculate height from width and render resolution** is off. Cancel leaves the applied size unchanged. Saved dimensions load on the next launch and survive **Reset comparison defaults**.
 
 For a full-screen square-pixel panel, **Calculate height from width and render resolution** derives:
 
@@ -20,7 +20,7 @@ heightMetres = measuredWidthMetres * renderPixelHeight / renderPixelWidth
 
 At 2880×1800, a 53 cm width implies a 33.125 cm height; a 34 cm width implies 21.25 cm. This fixes the ratio, not the absolute scale. Measure the visible panel without its bezel, enter the width, and check **both 10 cm rulers** with a physical ruler. Save afterwards.
 
-When exactly one active panel reports dimensions, the launcher reads an EDID hint. These are rounded centimetres, not measurements. If saved dimensions still equal the old 53×30 cm example, the demo uses the reported width provisionally. Other saved dimensions are retained. **Use monitor width estimate** fills the width draft and selects automatic height; **Apply and save** applies it. Multiple displays require manual measurement; the launcher removes an old hint instead of guessing a panel.
+When exactly one active panel reports dimensions, the launcher reads an EDID hint. These are rounded centimetres, not measurements, and never automatically replace applied screen dimensions. **Use monitor width estimate** fills the width draft and selects automatic height; **Apply and save** applies it. Multiple displays require manual measurement; the launcher removes an old hint instead of guessing.
 
 Disable automatic height derivation to enter two independent measurements. The package exposes `DisplayCalibration.deriveScreenHeightFromResolution`, default **false**. This mode assumes a full-panel camera. Smaller windows or letterboxed views need their actual physical viewport dimensions and position. Recheck the rulers after changing display scaling or resolution.
 
@@ -38,7 +38,7 @@ Disable automatic height derivation to enter two independent measurements. The p
 
 Vase maps import up to 2K, wood up to 1K, and the cubemap at 512 per face. Higher quality uses GPU time; tracking inference is unchanged. Sustained frame rate and presentation latency need a live test at the target resolution.
 
-**Billboard Illusion Mode** temporarily uses its own compact shadow range, TAA, optional SSAO, and adjustable render scale. The settings above return when the mode exits. See [edge stability and rendering speed](billboard-illusion.md#edge-stability-and-rendering-speed) for defaults and A/B controls.
+The fixed comparison uses compact shadows, TAA, optional SSAO and adjustable render scale. **Billboard effect** retains this profile on both sides of the comparison. Selecting a legacy layout restores its original rendering profile. See [edge stability and rendering speed](billboard-illusion.md#edge-stability-and-rendering-speed) for defaults and A/B controls.
 
 ![Unity material comparison](demo-realism.png)
 

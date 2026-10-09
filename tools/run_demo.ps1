@@ -1,10 +1,8 @@
 param(
     [ValidateRange(0, 20)]
     [int]$Camera = 0,
-    [switch]$TrackingTest,
-    [switch]$DepthTest,
-    [switch]$RealismTest,
-    [switch]$BillboardTest,
+    [switch]$NoTracker,
+    [string]$CalibrationDirectory,
     [switch]$Stop
 )
 
@@ -16,7 +14,15 @@ $trackerScript = Join-Path $projectRoot 'python_tracker\tracker.py'
 $modelFile = Join-Path $projectRoot 'python_tracker\face_landmarker.task'
 $outputLog = Join-Path $projectRoot 'Builds\HeadTrackedDemo\tracker-output.log'
 $errorLog = Join-Path $projectRoot 'Builds\HeadTrackedDemo\tracker-error.log'
-$calibrationFile = Join-Path $env:USERPROFILE 'AppData\LocalLow\DefaultCompany\Demo\tracker_runtime_calibration.json'
+if (-not $CalibrationDirectory) {
+    # Follow the checked-in Unity player identity, instead of a particular developer's PC.
+    $settings = Get-Content -LiteralPath (Join-Path $projectRoot 'Demo\ProjectSettings\ProjectSettings.asset') -Raw
+    $company = [regex]::Match($settings, '(?m)^\s*companyName:\s*(.+)$').Groups[1].Value.Trim()
+    $product = [regex]::Match($settings, '(?m)^\s*productName:\s*(.+)$').Groups[1].Value.Trim()
+    if (-not $company -or -not $product) { throw 'Unity companyName/productName are missing. Pass -CalibrationDirectory explicitly.' }
+    $CalibrationDirectory = Join-Path $env:USERPROFILE "AppData\LocalLow\$company\$product"
+}
+$calibrationFile = Join-Path $CalibrationDirectory 'tracker_runtime_calibration.json'
 
 function Get-ProjectTrackers {
     Get-CimInstance Win32_Process | Where-Object {
@@ -74,9 +80,11 @@ try {
     try { $ownsMutex = $mutex.WaitOne(0) }
     catch [System.Threading.AbandonedMutexException] { $ownsMutex = $true }
     if (-not $ownsMutex -or $players.Count -gt 0) {
-        throw 'The demo is already running. Close it with Alt+F4, or run Stop-HeadTrackedDemo.cmd, before launching again.'
+        throw 'The demo is already running. Close it with Alt+F4, or run Run-HeadTrackedDemo.cmd -Stop, before launching again.'
     }
-    foreach ($required in @($gameExe, $pythonExe, $trackerScript, $modelFile)) {
+    $requiredFiles = @($gameExe)
+    if (-not $NoTracker) { $requiredFiles += @($pythonExe, $trackerScript, $modelFile) }
+    foreach ($required in $requiredFiles) {
         if (-not (Test-Path -LiteralPath $required)) {
             throw "Missing $required. Follow the setup and build steps in README.md."
         }
@@ -86,35 +94,34 @@ try {
     $lifetimeFile = Join-Path (Split-Path -Parent $gameExe) ('tracker-session-' + [guid]::NewGuid().ToString('N') + '.heartbeat')
     [System.IO.File]::WriteAllText($lifetimeFile, '')
 
-    Write-Host "Starting Unity demo and webcam $Camera. Close the game with Alt+F4."
-    $gameArguments = if ($BillboardTest) { @('--billboard-test') } elseif ($RealismTest) { @('--realism-test') } elseif ($DepthTest) { @('--depth-test') } elseif ($TrackingTest) { @('--tracking-test') } else { @() }
+    if ($NoTracker) { Write-Host 'Starting Unity demo without a webcam tracker. Close the game with Alt+F4.' }
+    else { Write-Host "Starting Unity demo and webcam $Camera. Close the game with Alt+F4." }
     $startGame = @{
         FilePath = $gameExe; WorkingDirectory = (Split-Path -Parent $gameExe)
         WindowStyle = 'Normal'; PassThru = $true
     }
-    if ($gameArguments.Count -gt 0) { $startGame.ArgumentList = $gameArguments }
     $game = Start-Process @startGame
     Start-Sleep -Milliseconds 750
     $game.Refresh()
-    if ($game.HasExited) { throw "Unity exited at startup (code $($game.ExitCode)). Check Player.log in AppData\LocalLow\DefaultCompany\Demo." }
+    if ($game.HasExited) { throw "Unity exited at startup (code $($game.ExitCode)). Check Player.log in $CalibrationDirectory." }
 
-    $tracker = Start-Process -FilePath $pythonExe `
+    if (-not $NoTracker) { $tracker = Start-Process -FilePath $pythonExe `
         -ArgumentList @('-u', ('"' + $trackerScript + '"'), '--camera', [string]$Camera,
             '--calibration-file', ('"' + $calibrationFile + '"'), '--lifetime-file', ('"' + $lifetimeFile + '"')) `
         -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru `
-        -RedirectStandardOutput $outputLog -RedirectStandardError $errorLog
+        -RedirectStandardOutput $outputLog -RedirectStandardError $errorLog }
 
     while (-not $game.HasExited) {
         [System.IO.File]::WriteAllText($lifetimeFile, '')
-        $tracker.Refresh()
-        if ($tracker.HasExited) {
+        if ($tracker) { $tracker.Refresh() }
+        if ($tracker -and $tracker.HasExited) {
             $details = if (Test-Path -LiteralPath $errorLog) { Get-Content -LiteralPath $errorLog -Raw } else { '' }
             throw "Webcam tracker stopped. $details"
         }
         Start-Sleep -Milliseconds 250
         $game.Refresh()
     }
-    if ($game.ExitCode -ne 0) { throw "Unity exited with code $($game.ExitCode). Check Player.log in AppData\LocalLow\DefaultCompany\Demo." }
+    if ($game.ExitCode -ne 0) { throw "Unity exited with code $($game.ExitCode). Check Player.log in $CalibrationDirectory." }
 }
 finally {
     # Only the launcher that acquired the mutex owns these resources.
@@ -125,7 +132,8 @@ finally {
             $game.Refresh()
             if (-not $game.HasExited) { Stop-Process -Id $game.Id -ErrorAction SilentlyContinue }
         }
-        Write-Host "Webcam tracker stopped. Logs: $outputLog and $errorLog"
+        if ($NoTracker) { Write-Host 'Demo stopped.' }
+        else { Write-Host "Webcam tracker stopped. Logs: $outputLog and $errorLog" }
     }
     if ($ownsMutex) { $mutex.ReleaseMutex() }
     $mutex.Dispose()

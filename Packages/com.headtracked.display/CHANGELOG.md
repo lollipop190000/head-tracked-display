@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Add `HeadTrackedDisplay.TrackingEnabled` to hold the current rendered viewpoint while fresh observation collection and filtering continue.
+- Add `BillboardIllusionController.EffectEnabled` to compare dressing on/off without replacing or repositioning content.
+- Reorganize the demo around one stationary comparison, independent switches, minimal setup, a right-hand settings drawer and separate calibration/preferences/experiment saves. Consolidate Windows launchers.
+
 ## 0.4.1
 
 - Remove overlapping coplanar surfaces between billboard rims and chamber walls, which could shimmer at their shared boundary.

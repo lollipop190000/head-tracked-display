@@ -30,6 +30,12 @@ The render camera keeps the screen plane's orientation. The Python tracker fits 
 
 See the [repository README](https://github.com/lollipop190000/head-tracked-display) for the Python tracker, native plugin, checkerboard calibration, and demo instructions. MIT license; see `LICENSE.md`.
 
+## Hold a viewpoint for comparison
+
+Set `display.TrackingEnabled = false` to hold the current rendered eye position and off-axis projection. Observations, validity, confidence, raw/estimated eye position and filtering continue. Set it back to true to resume the live filtered eye position. `EyePositionMeters` and `PoseUpdated` describe the rendered position. This differs from disabling the component, which resets the camera projection.
+
 ## Optional billboard illusion
 
 `BillboardIllusionController` adds a recessed chamber, screen-plane frame/dark surround, and an owned clone of an ordinary model. Configure it with the existing display and an optional prefab; edit `Settings` in screen-local metres. It retains the prefab's materials and proportions, uniformly fits its specified height, and leaves the source object and camera/tracking calculations unchanged. Disable the controller to hide its generated rig. Assign materials compatible with the project's render pipeline; no URP or demo dependency is added. See the [billboard guide](https://github.com/lollipop190000/head-tracked-display/blob/main/docs/billboard-illusion.md) for scene setup code, API/ownership, performance considerations, and tests.
+
+Set `controller.EffectEnabled = false` to hide only the frame, surround and chamber (including references). The content instance remains visible with its existing transform and materials. Switching back restores the configured dressing options; it does not rebuild content or alter tracking. Disabling the component still hides the entire rig.

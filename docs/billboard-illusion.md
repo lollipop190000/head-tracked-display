@@ -4,23 +4,20 @@ An optional scene layer for a head-tracked physical window: a recessed chamber, 
 
 ## Try the demo
 
-Run [`Run-BillboardTest.cmd`](../Run-BillboardTest.cmd), or enable **Billboard Illusion Mode** in the demo settings. Enter the measured visible display dimensions through **Display size** first. Do not include the monitor bezel.
+Run [Run-HeadTrackedDemo.cmd](../Run-HeadTrackedDemo.cmd) and complete physical setup. The default fixed scene uses the same ceramic vase for all three switches. **Billboard effect** hides/shows the frame, chamber and references without replacing the target or changing render quality.
 
-- Start with **Animate in/out** off. Move sideways, vertically, and towards/away from the screen while watching the fixed object.
-- Toggle **Frame / dark surround** to compare the depth cue with the same tracking and object placement.
-- Choose a metal sphere, miniature bear, or miniature chair. **Model height** describes the miniature's actual height in centimetres; it is not a tracking gain.
-- Adjust chamber depth, horizontal position, and model centre depth. Positive depth is behind the display; negative is towards the viewer.
-- Turn on animation to demonstrate passing through the frame. This intentionally moves the object and is separate from the fixed-object tracking test.
-- **F1** hides/shows the panels. **Save billboard settings and mode** persists the selection and parameters.
-- Turning the mode off restores the previous scene visibility and model transforms. **Reset demo to defaults** restores the full original layout and billboard defaults while retaining physical screen/camera calibration.
+- Move sideways, vertically and towards/away from the screen, then compare Billboard effect ON/OFF.
+- Head tracking OFF holds the current viewpoint while measurements continue. Surface detail changes independently.
+- **Settings > Appearance** has detailed dimensions, frame/reference options, edge stability, render scale and optional animation. Leave animation off for stationary comparisons.
+- **Settings > Layouts** offers explicit sphere/bear/chair/vase content changes and legacy experiments.
+- F1 hides the UI; F2 opens the right-hand drawer. Calibration and layout saves are separate.
+- **Reset comparison defaults** restores the fixed scene while retaining physical calibration.
 
-The default opening is 76% of display width and 70% of height. The chamber is 22 cm deep, the target is 8 cm tall, and its static bounds centre is 3.5 cm in front of the display. Its offset near the right rim makes depth ordering easy to see. Two optional rear blocks provide scale and depth references.
-
-![Head-tracked billboard scene](demo-billboard.png)
+Package defaults remain a 76% by 70% opening, 22 cm chamber, 8 cm sphere, depth -3.5 cm and horizontal fraction .35. The demo uses a 16 cm vase, depth -2 cm, fraction .24 and a 30 cm chamber. Animation defaults off.
 
 ## Edge stability and rendering speed
 
-The demo defaults to **Stable edges** on, **Contact AO** off, and **Render scale** at 85%. These settings are saved with the billboard layout; older saved layouts use the new defaults. Reset restores these defaults while preserving measured display/camera calibration.
+The demo defaults to **Stable edges** on, **Contact AO** off, and **Render scale** at 85%. These session settings are included only by **Save experimental layout**; load that experiment explicitly to restore them. Reset restores these defaults while preserving measured display/camera calibration.
 
 | Setting | Effect |
 | --- | --- |
@@ -93,7 +90,7 @@ The frame and surround sit at the physical screen plane, with thin 3D rims. Ordi
 
 Tests check an independent package rig on a translated/rotated screen, source model/material/calibration preservation, static transform reuse, disjoint rim/chamber faces, resizing and enable/disable lifecycle, rendered front/behind occlusion, and restoration of an existing demo comparison. A demo test renders TAA history at three off-axis eye positions, checks the physical screen corner and unchanged camera projection, and verifies rendering-profile restoration. Existing projection and tracking tests remain applicable.
 
-Validation passed 35 EditMode and 11 PlayMode tests. All three package billboard tests also passed in a separate Unity URP project with no demo scripts/resources. The Windows player built and the billboard launcher connected the Python webcam tracker; closing it released the tracker. These checks do not establish perceived realism, full motion latency, or sustained frame rate with a live viewer.
+The suite covers package geometry/lifecycle and independent demo comparisons. All three package billboard tests also passed in a separate Unity URP project with no demo scripts/resources. The unified Windows launcher manages the Python webcam tracker and releases it on close. These checks do not establish perceived realism, full motion latency, or sustained frame rate with a live viewer.
 
 The black surround reserves **screen pixels** for crossing the virtual frame. The actual monitor bezel still clips output. This does not produce stereoscopic eye separation or change the physical focus distance. Perceived realism and benefit over the normal mode require a human comparison on a calibrated monitor. This first version targets one planar full-screen display, not a physical L-shaped or multi-panel LED installation.
 

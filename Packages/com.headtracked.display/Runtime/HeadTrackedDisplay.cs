@@ -15,6 +15,9 @@ namespace HeadTracked.Display
 
         private Camera targetCamera;
         private Vector3 currentEye;
+        private Vector3 trackedEye;
+        private Vector3 comparisonEye;
+        [SerializeField] private bool trackingEnabled = true;
         private HeadObservation latest;
         private bool hasLatest;
         private bool initialized;
@@ -27,6 +30,16 @@ namespace HeadTracked.Display
         public DisplayCalibration Calibration => calibration;
         public Transform ScreenPlane => screenPlane;
         public Vector3 EyePositionMeters => currentEye;
+        /// <summary>Freeze the rendered viewpoint in place while observations and filtering continue.</summary>
+        public bool TrackingEnabled
+        {
+            get => trackingEnabled;
+            set
+            {
+                if (!value && trackingEnabled) comparisonEye = initialized ? currentEye : NeutralEye;
+                trackingEnabled = value;
+            }
+        }
         public Vector3 EstimatedEyePositionMeters { get; private set; }
         public Vector3 UncalibratedEyePositionMeters { get; private set; }
         public bool HasFreshEyeEstimate { get; private set; }
@@ -79,6 +92,7 @@ namespace HeadTracked.Display
             targetCamera = GetComponent<Camera>();
             if (observationSource is PythonBridgeSource python) python.ConfigureCalibration(calibration);
             currentEye = NeutralEye;
+            trackedEye = comparisonEye = currentEye;
             initialized = true;
         }
 
@@ -107,7 +121,7 @@ namespace HeadTracked.Display
             EstimatedEyePositionMeters = estimated;
             if (valid) lastValidTime = Time.realtimeSinceStartupAsDouble;
             Vector3 target = valid ? estimated :
-                (Time.realtimeSinceStartupAsDouble - lastValidTime < .12 ? currentEye : NeutralEye);
+                (Time.realtimeSinceStartupAsDouble - lastValidTime < .12 ? trackedEye : NeutralEye);
             float timeConstant = valid ? trackingSmoothingSeconds : returnToNeutralSeconds;
             float alpha = 1f - Mathf.Exp(-Time.unscaledDeltaTime / Mathf.Max(0.001f, timeConstant));
             if (valid && UseAdaptiveFilter)
@@ -117,17 +131,18 @@ namespace HeadTracked.Display
                     filteredEye = adaptiveFilter.Filter(estimated, latest.receivedAtSeconds - latest.frameAgeMs * .001);
                     lastFilteredObservation = latest.receivedAtSeconds;
                 }
-                currentEye = Time.realtimeSinceStartupAsDouble < reacquireUntil
-                    ? Vector3.Lerp(currentEye, filteredEye, 1f - Mathf.Exp(-Time.unscaledDeltaTime / .045f))
+                trackedEye = Time.realtimeSinceStartupAsDouble < reacquireUntil
+                    ? Vector3.Lerp(trackedEye, filteredEye, 1f - Mathf.Exp(-Time.unscaledDeltaTime / .045f))
                     : filteredEye;
             }
             else
             {
-                currentEye = Vector3.Lerp(currentEye, target, alpha);
+                trackedEye = Vector3.Lerp(trackedEye, target, alpha);
                 adaptiveFilter.Reset();
                 lastFilteredObservation = double.NegativeInfinity;
             }
 
+            currentEye = trackingEnabled ? trackedEye : comparisonEye;
             targetCamera.transform.SetPositionAndRotation(
                 screenPlane != null ? screenPlane.TransformPoint(currentEye) : currentEye,
                 screenPlane != null ? screenPlane.rotation : Quaternion.identity);
