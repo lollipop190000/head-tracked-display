@@ -61,6 +61,12 @@ The original full-layout shallow preset uses centre depths `-2.5, +10, +16, -6 c
 
 The model layout is saved separately as `demo_model_layout.json` in Unity's persistent data directory. The default and saved layouts may be clipped at the screen edge; foreground models must also remain beyond the camera near plane.
 
+## Physical viewport contract for consumers
+
+Physical width/height describe the calibrated display or full render surface, with the screen Transform at its centre. A camera using a smaller `Camera.rect` must use the corresponding smaller, offset physical aperture. `HeadTrackedDisplay` now applies this crop automatically. A consumer that measures only that camera's aperture should use a full camera rect and supply its screen frame explicitly instead of cropping those dimensions again.
+
+For a window on a measured full panel, set `DisplayViewport` to the window's actual normalized bottom-left position and size on that panel. Camera cropping and letterboxing are composed inside that rectangle. Resolution and OS UI scaling alone do not reveal physical size or placement; native mapping belongs in the consumer. Keep webcam and eye positions relative to the calibrated panel centre, and confirm rulers again after a window move/resize. The stock demo still uses its full render surface. This change does not establish real webcam or perceptual acceptance.
+
 ## Centred fixation comparison
 
 Choose **Settings > Layouts > Centred fixation target (+5 cm)**. This keeps one green plant, 15 cm tall, with its bounds centre at `(0, 0, +0.05)` metres relative to the screen. The room, supports, and other models are hidden so their contact with a floor does not dominate the comparison. This is an isolated diagnostic layout; hiding context may also weaken depth cues. The renderer still uses the same physically based camera projection.

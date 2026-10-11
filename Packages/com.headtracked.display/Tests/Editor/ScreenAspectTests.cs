@@ -6,6 +6,25 @@ namespace HeadTracked.Display.Tests
 {
     public sealed class ScreenAspectTests
     {
+        [Test]
+        public void CroppedCameraDerivesFullSurfaceHeightOnlyOnce()
+        {
+            var item = new GameObject("Cropped physical aspect test");
+            var target = new RenderTexture(1600, 1000, 0);
+            try
+            {
+                var camera = item.AddComponent<Camera>(); camera.targetTexture = target;
+                camera.rect = new Rect(.1f, .2f, .7f, .5f);
+                var display = item.AddComponent<HeadTrackedDisplay>();
+                display.Calibration.screenWidth = .4f;
+                display.Calibration.deriveScreenHeightFromResolution = true;
+                typeof(HeadTrackedDisplay).GetMethod("LateUpdate", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(display, null);
+                Assert.That(display.Calibration.screenHeight, Is.EqualTo(.25f).Within(1e-6));
+                Assert.That(display.ProjectionScreenRectMeters.height, Is.EqualTo(.125f).Within(1e-6));
+            }
+            finally { Object.DestroyImmediate(item); Object.DestroyImmediate(target); }
+        }
+
         [TestCase(2880, 1800)]
         [TestCase(1920, 1080)]
         public void MeasuredWidthAndRenderAspectProduceEqualPhysicalScaleOnBothAxes(int width, int height)

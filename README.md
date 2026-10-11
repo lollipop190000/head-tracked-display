@@ -59,6 +59,8 @@ Compare one switch at a time or any combination. **F1** hides the UI. **Settings
 
 See [demo structure and extension rules](docs/demo-workflow.md), [tracking tests](docs/tracking-test.md), [physical scale](docs/physical-scale.md), [rendering](docs/rendering.md), and [billboard API](docs/billboard-illusion.md).
 
+Consumers using a cropped camera or a window placed on a calibrated panel can supply `HeadTrackedDisplay.DisplayViewport`. The package composes this normalized physical render-surface rectangle with `Camera.rect`, and exposes the aperture as `ProjectionScreenRectMeters`. Eye coordinates stay relative to the original display centre. See the [package setup and viewport contract](Packages/com.headtracked.display/README.md).
+
 ## Build from source
 
 The checked-in demo targets **Unity 6000.3.22f1 (6.3 LTS)**, URP 17.3.0 and Windows x64. Python tracking needs Python 3 and a webcam. Other Unity projects can consume the core package independently; other platforms need a compatible provider and build validation.

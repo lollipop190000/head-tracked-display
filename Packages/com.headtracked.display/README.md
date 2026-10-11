@@ -2,7 +2,9 @@
 
 Single viewer, physical monitor off-axis projection for Unity 6.3 or newer. The package moves one Unity camera and updates its asymmetric projection from an interchangeable eye observation source. Models and their materials require no tracking code.
 
-`DisplayCalibration.deriveScreenHeightFromResolution` optionally derives physical height from measured width and camera pixel aspect. It defaults to false in the package. Use it only for a camera covering a full square-pixel panel; verify physical rulers on both axes. It does not recover unknown absolute monitor size.
+`DisplayCalibration.deriveScreenHeightFromResolution` optionally derives physical height from measured width and the full render-surface aspect, before cropping by `Camera.rect`. It defaults to false. Use it only when that surface covers the full square-pixel panel; verify physical rulers on both axes. It is suspended while `DisplayViewport` maps a smaller window onto a panel, whose physical aspect cannot be inferred from the window resolution.
+
+`HeadTrackedDisplay.DisplayViewport` describes the full render surface on the calibrated physical display as a normalized bottom-left rectangle (default `(0,0,1,1)`). `Camera.rect` crops that surface once. `ProjectionScreenRectMeters` exposes the resulting physical aperture in the original screen frame. The eye, webcam offset and screen Transform always retain the original display centre; resizing or moving a window changes the aperture, without adding a second eye translation. Consumers must supply actual window-to-panel bounds; this package has no native window or monitor dependency. A render texture has no inferred physical placement. `OffAxisProjection.Calculate(eye, Rect, near, far)` supports a directly measured asymmetric aperture. `ScreenWindowFrame` follows its edges without modifying content.
 
 ## Install
 

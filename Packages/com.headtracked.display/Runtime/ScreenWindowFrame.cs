@@ -72,7 +72,10 @@ namespace HeadTracked.Display
                 root.localRotation = Quaternion.identity;
                 root.localScale = Vector3.one;
             }
-            float width = display.Calibration.screenWidth, height = display.Calibration.screenHeight;
+            Rect aperture = display.ProjectionScreenRectMeters;
+            float width = aperture.width, height = aperture.height;
+            var centre = new Vector3(aperture.center.x, aperture.center.y, 0);
+            if (root.localPosition != centre) root.localPosition = centre;
             // Leave a positive opening even when a consumer supplies an oversized border.
             float border = Mathf.Min(PositiveOrDefault(borderWidthMeters, .008f), Mathf.Min(width, height) * .25f);
             float depth = PositiveOrDefault(depthMeters, .015f);
