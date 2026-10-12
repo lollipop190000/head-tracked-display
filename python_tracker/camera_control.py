@@ -12,6 +12,16 @@ from cv2_enumerate_cameras import enumerate_cameras
 BACKENDS = {"dshow": cv2.CAP_DSHOW, "msmf": cv2.CAP_MSMF}
 
 
+def frame_status(width, height, age, blank):
+    if width <= 0 or height <= 0:
+        return "Waiting for camera frames"
+    if blank:
+        return "Black video: connect the source in EShare / camera app"
+    if age >= 2:
+        return "No new camera frames: check the camera source"
+    return "Receiving camera frames"
+
+
 def discover_cameras():
     devices = []
     for backend, api in BACKENDS.items():

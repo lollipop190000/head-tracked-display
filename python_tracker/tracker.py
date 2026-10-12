@@ -11,7 +11,7 @@ import cv2
 import mediapipe as mp
 from pose_estimator import PoseEstimator
 from session_lifetime import SessionLifetime
-from camera_control import BACKENDS, CameraControl, discover_cameras, select_camera
+from camera_control import BACKENDS, CameraControl, discover_cameras, select_camera, frame_status
 
 ROOT = Path(__file__).resolve().parent
 
@@ -134,6 +134,9 @@ def run(args: argparse.Namespace) -> None:
     save_selection = False
     camera_error = ""
     next_control_poll = 0.0
+    frame_width = frame_height = 0
+    last_frame_at = opened_at
+    last_blank = False
     controls.publish(device, "Opening camera")
     last_result = time.monotonic()
     fps = 0.0
@@ -171,6 +174,9 @@ def run(args: argparse.Namespace) -> None:
                         sequence = 0
                         opened_at = time.monotonic()
                         awaiting_first_frame = True
+                        frame_width = frame_height = 0
+                        last_frame_at = opened_at
+                        last_blank = False
                         pose = PoseEstimator(args.calibration_file)
                         print(f"Selected webcam {device['index']}: {device['name']} ({device['backend']})", flush=True)
                         # Drop the old camera's face while waiting for a fresh frame.
@@ -195,12 +201,16 @@ def run(args: argparse.Namespace) -> None:
                         save_selection = False
                         camera_error = f"No frames from {failed['name']}; restored previous camera."
                     if now - last_status >= 1:
-                        controls.publish(device, "Waiting for camera frames", camera_error)
+                        controls.publish(device, frame_status(frame_width, frame_height, now - last_frame_at, last_blank),
+                                         camera_error, frame_width, frame_height, last_blank)
                         last_status = now
                     time.sleep(.002)
                     continue
                 sequence, captured_at, frame = newest
                 height, width = frame.shape[:2]
+                frame_width, frame_height = width, height
+                last_frame_at = time.monotonic()
+                last_blank = bool(frame[::16, ::16].max() <= 1)
                 if awaiting_first_frame:
                     awaiting_first_frame = False
                     previous_device = None
@@ -209,10 +219,8 @@ def run(args: argparse.Namespace) -> None:
                         save_selection = False
                 now = time.monotonic()
                 if now - last_status >= 1:
-                    sample = frame[::16, ::16]
-                    blank = bool(sample.max() <= 1)
-                    controls.publish(device, "Black video: connect the source in EShare / camera app" if blank else "Receiving camera frames",
-                                     camera_error, width, height, blank)
+                    controls.publish(device, frame_status(width, height, 0, last_blank),
+                                     camera_error, width, height, last_blank)
                     last_status = now
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)

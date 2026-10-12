@@ -4,7 +4,7 @@ import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from camera_control import CameraControl, read_json, select_camera, write_json
+from camera_control import CameraControl, read_json, select_camera, write_json, frame_status
 
 
 def device(name, index, backend="dshow"):
@@ -12,6 +12,11 @@ def device(name, index, backend="dshow"):
 
 
 class CameraControlTests(unittest.TestCase):
+    def test_normal_interframe_gap_is_not_reported_as_missing_camera_and_black_source_stays_clear(self):
+        self.assertEqual(frame_status(640, 480, .02, False), "Receiving camera frames")
+        self.assertIn("No new", frame_status(640, 480, 3, False))
+        self.assertIn("Black video", frame_status(1280, 720, 10, True))
+        self.assertEqual(frame_status(0, 0, 10, False), "Waiting for camera frames")
     def test_preference_follows_device_when_indices_change_but_explicit_index_wins(self):
         original = device("EShare", 1)
         current = [device("EShare", 0), device("Laptop", 1)]
