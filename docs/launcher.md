@@ -10,6 +10,7 @@
 | `-PlayerArguments` | Optional command-line string appended to the player arguments, for example benchmark controls. Passed directly to the executable without shell evaluation. Quote argument values containing spaces within this string. |
 | `-CalibrationDirectory` | `%USERPROFILE%/AppData/LocalLow/<company>/<product>`. An override is supplied to both children through `HEADTRACKED_CALIBRATION_DIRECTORY`; `PythonBridgeSource` publishes tracker configuration there. Consumers can use the same directory for their own calibration/preferences. |
 | `-Camera` | Webcam index 0, configurable from 0 to 20. |
+| `-CameraBackend` | `dshow` by default; `msmf` selects Windows Media Foundation. Indices belong to that backend. |
 | `-NoTracker` | Opens the player without Python and forwards `--no-tracker` so consumers can disable their Unity bridge. |
 | `-Stop` | Stops the target executable and that target's managed Python processes. Pass the same path/calibration arguments used to start it. |
 
@@ -22,5 +23,9 @@ The launcher sends Unity `-logFile` pointing to `Player.log` beside the executab
 A tracker is owned only when its exact script path, calibration argument and managed heartbeat directory match the target. Both Python processes of a Windows virtual environment can be terminated, but another project's tracker and manually started trackers are preserved. Alt+F4 stops the managed tracker; deleting or abandoning the heartbeat also releases its webcam after the tracker's eight-second deadline. `-Stop` first attempts a graceful player close.
 
 The current Python bridge uses loopback TCP port 8765. Run one webcam-tracked target at a time; separate target ownership does not allocate extra tracker ports or webcams.
+
+When `-Camera` is omitted, Python resolves the saved camera by device path/name and backend, falling back to index 0 when no saved device resolves. An explicit `-Camera` overrides that preference. Device enumeration uses pinned `cv2-enumerate-cameras`; reinstall tracker requirements when updating this revision.
+
+For optional consumer UI, Python publishes `tracker_camera_status.json` next to runtime calibration with `session`, `updatedUnix`, `devices`, `selected`, `status`, frame dimensions and `blankFrames`. Each device has an opaque `id`, name, path, backend and index. Submit `tracker_camera_request.json` with the current `session`, a fresh `revision`, `action: "select"` and the listed `deviceId`, or `action: "refresh"`. Only the current session accepts requests; discovery does not open streams. A failed camera switch restores the previous device when possible. Once a selected camera supplies a frame, Python saves it separately in `tracker_camera_preference.json`. No image is saved. A received black image is distinguished from no frames. Changing a device does not migrate or overwrite physical camera calibration.
 
 Run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/test_launcher.ps1` for target resolution, path quoting, defaults, mutex identity and process ownership checks. The test starts no player and opens no webcam. It also checks PowerShell syntax and cleans only its explicitly verified temporary directory under `Builds`.

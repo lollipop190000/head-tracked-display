@@ -12,6 +12,7 @@ __pycache__/
 python_tracker/.venv/
 python_tracker/face_landmarker.task
 python_tracker/calibration.json
+**/tracker_camera_*.json
 Demo/Assets/StreamingAssets/face_landmarker.task
 Demo/Assets/StreamingAssets/face_landmarker.task.meta
 Demo/Assets/StreamingAssets/camera_intrinsics.json

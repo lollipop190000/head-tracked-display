@@ -22,13 +22,16 @@ For your own project, start with the [package integration guide](Packages/com.he
 Double-click [Run-HeadTrackedDemo.cmd](Run-HeadTrackedDemo.cmd) on a prepared Windows checkout.
 
 ```powershell
-./Run-HeadTrackedDemo.cmd                 # webcam 0
+./Run-HeadTrackedDemo.cmd                 # saved camera selection, otherwise webcam 0
 ./Run-HeadTrackedDemo.cmd -Camera 1       # another webcam
+./Run-HeadTrackedDemo.cmd -Camera 1 -CameraBackend msmf # explicit Windows capture backend
 ./Run-HeadTrackedDemo.cmd -NoTracker      # visual comparisons without a webcam
 ./Run-HeadTrackedDemo.cmd -Stop           # stop this checkout's player and tracker
 ```
 
 **Alt+F4** closes the player and stops its tracker. A heartbeat releases the webcam if the launcher disappears. Builds, Python environments and the downloaded face model are excluded from Git; a new clone needs the setup below.
+
+`tracker.py --list-cameras` lists device names and indices for DirectShow (`dshow`) and Media Foundation (`msmf`) without opening their video streams. Indices belong to each backend. A consumer can use the companion camera-control protocol described in [launcher details](docs/launcher.md) to switch devices during tracking. The last confirmed selection is separate from physical calibration. EShare and other virtual cameras may supply black frames until their source application connects an image feed.
 
 The same entry point can launch another Unity project using `-UnityProject <directory> -PlayerPath <exe> -TrackerRoot <technology checkout or python_tracker directory>`. Relative paths are resolved from the current shell directory. For example:
 
