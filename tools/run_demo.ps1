@@ -101,7 +101,8 @@ try {
     [System.IO.File]::WriteAllText($lifetimeFile, '')
 
     if ($NoTracker) { Write-Host "Starting $($target.Product) without a webcam tracker. Close the game with Alt+F4." }
-    else { Write-Host "Starting $($target.Product) and webcam $Camera. Close the game with Alt+F4." }
+    elseif ($PSBoundParameters.ContainsKey('Camera')) { Write-Host "Starting $($target.Product) and webcam $Camera ($CameraBackend). Close the game with Alt+F4." }
+    else { Write-Host "Starting $($target.Product) with its saved webcam selection (otherwise webcam 0). Close the game with Alt+F4." }
     [Environment]::SetEnvironmentVariable('HEADTRACKED_CALIBRATION_DIRECTORY', $CalibrationDirectory, 'Process')
     $calibrationEnvironmentChanged = $true
     $startGame = @{
