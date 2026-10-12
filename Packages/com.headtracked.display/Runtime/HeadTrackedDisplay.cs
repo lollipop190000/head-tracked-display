@@ -29,6 +29,19 @@ namespace HeadTracked.Display
 
         public DisplayCalibration Calibration => calibration;
         public Transform ScreenPlane => screenPlane;
+        private Rect displayViewport = PhysicalScreenViewport.Full;
+        /// <summary>Render surface on the calibrated display, normalized from bottom left. Not persisted as calibration.</summary>
+        public Rect DisplayViewport
+        {
+            get => displayViewport;
+            set
+            {
+                if (!PhysicalScreenViewport.IsValid(value)) throw new ArgumentOutOfRangeException(nameof(value));
+                displayViewport = value;
+            }
+        }
+        public Rect ProjectionScreenRectMeters => PhysicalScreenViewport.Calculate(calibration.screenWidth,
+            calibration.screenHeight, displayViewport, (targetCamera != null ? targetCamera : GetComponent<Camera>()).rect);
         public Vector3 EyePositionMeters => currentEye;
         /// <summary>Freeze the rendered viewpoint in place while observations and filtering continue.</summary>
         public bool TrackingEnabled
@@ -101,8 +114,10 @@ namespace HeadTracked.Display
         private void LateUpdate()
         {
             if (!initialized) Awake();
-            if (calibration.deriveScreenHeightFromResolution && targetCamera.pixelWidth > 0 && targetCamera.pixelHeight > 0)
-                calibration.screenHeight = calibration.screenWidth * targetCamera.pixelHeight / targetCamera.pixelWidth;
+            if (calibration.deriveScreenHeightFromResolution && displayViewport == PhysicalScreenViewport.Full &&
+                targetCamera.pixelWidth > 0 && targetCamera.pixelHeight > 0)
+                calibration.screenHeight = calibration.screenWidth *
+                    (targetCamera.pixelHeight / targetCamera.rect.height) / (targetCamera.pixelWidth / targetCamera.rect.width);
             Vector3 estimated = NeutralEye;
             bool available = observationSource != null && observationSource.isActiveAndEnabled &&
                              observationSource.TryGetLatest(out latest);
@@ -147,7 +162,7 @@ namespace HeadTracked.Display
                 screenPlane != null ? screenPlane.TransformPoint(currentEye) : currentEye,
                 screenPlane != null ? screenPlane.rotation : Quaternion.identity);
             targetCamera.projectionMatrix = OffAxisProjection.Calculate(currentEye,
-                calibration.screenWidth, calibration.screenHeight,
+                ProjectionScreenRectMeters,
                 targetCamera.nearClipPlane, targetCamera.farClipPlane);
             PoseUpdated?.Invoke(currentEye, IsTracking, Confidence);
         }

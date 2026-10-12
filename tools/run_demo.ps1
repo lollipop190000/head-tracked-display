@@ -1,6 +1,8 @@
 param(
     [ValidateRange(0, 20)]
     [int]$Camera = 0,
+    [ValidateSet('dshow', 'msmf')]
+    [string]$CameraBackend = 'dshow',
     [switch]$NoTracker,
     [string]$UnityProject,
     [string]$PlayerPath,
@@ -99,7 +101,8 @@ try {
     [System.IO.File]::WriteAllText($lifetimeFile, '')
 
     if ($NoTracker) { Write-Host "Starting $($target.Product) without a webcam tracker. Close the game with Alt+F4." }
-    else { Write-Host "Starting $($target.Product) and webcam $Camera. Close the game with Alt+F4." }
+    elseif ($PSBoundParameters.ContainsKey('Camera')) { Write-Host "Starting $($target.Product) and webcam $Camera ($CameraBackend). Close the game with Alt+F4." }
+    else { Write-Host "Starting $($target.Product) with its saved webcam selection (otherwise webcam 0). Close the game with Alt+F4." }
     [Environment]::SetEnvironmentVariable('HEADTRACKED_CALIBRATION_DIRECTORY', $CalibrationDirectory, 'Process')
     $calibrationEnvironmentChanged = $true
     $startGame = @{
@@ -113,12 +116,16 @@ try {
     $game.Refresh()
     if ($game.HasExited) { throw "Unity exited at startup (code $($game.ExitCode)). Check $($target.PlayerLog)." }
 
-    if (-not $NoTracker) { $tracker = Start-Process -FilePath $pythonExe `
-        -ArgumentList @('-u', ('"' + $trackerScript + '"'), '--camera', [string]$Camera,
+    if (-not $NoTracker) {
+        $trackerArguments = @('-u', ('"' + $trackerScript + '"'), '--camera-backend', $CameraBackend,
             '--model', ('"' + $modelFile + '"'),
-            '--calibration-file', ('"' + $calibrationFile + '"'), '--lifetime-file', ('"' + $lifetimeFile + '"')) `
+            '--calibration-file', ('"' + $calibrationFile + '"'), '--lifetime-file', ('"' + $lifetimeFile + '"'))
+        if ($PSBoundParameters.ContainsKey('Camera')) { $trackerArguments += @('--camera', [string]$Camera) }
+        $tracker = Start-Process -FilePath $pythonExe `
+        -ArgumentList $trackerArguments `
         -WorkingDirectory $target.TrackerDirectory -WindowStyle Hidden -PassThru `
-        -RedirectStandardOutput $outputLog -RedirectStandardError $errorLog }
+        -RedirectStandardOutput $outputLog -RedirectStandardError $errorLog
+    }
 
     # Child processes inherit their own copy. Restore only this launcher's process environment.
     [Environment]::SetEnvironmentVariable('HEADTRACKED_CALIBRATION_DIRECTORY', $previousCalibrationEnvironment, 'Process')

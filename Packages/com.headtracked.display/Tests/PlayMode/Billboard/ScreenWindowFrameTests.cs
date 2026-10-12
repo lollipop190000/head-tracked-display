@@ -74,6 +74,26 @@ namespace HeadTracked.Display.Tests
             Assert.That(left.hasChanged, Is.False);
         }
 
+        [Test]
+        public void OffsetViewportMovesOnlyFrameToPhysicalApertureAndRestores()
+        {
+            var root = frame.RigRoot;
+            var contentPosition = content.transform.position;
+            display.DisplayViewport = new Rect(.1f, .2f, .5f, .6f);
+            cameraObject.GetComponent<Camera>().rect = new Rect(.1f, 0, .8f, 1);
+            frame.Refresh();
+            Rect aperture = display.ProjectionScreenRectMeters;
+            Assert.That(root.localPosition, Is.EqualTo(new Vector3(aperture.center.x, aperture.center.y, 0)));
+            Assert.That(root.GetChild(2).localScale.x, Is.EqualTo(aperture.width).Within(1e-6));
+            frame.EffectEnabled = false; frame.EffectEnabled = true;
+            Assert.That(content.transform.position, Is.EqualTo(contentPosition));
+            display.DisplayViewport = PhysicalScreenViewport.Full;
+            cameraObject.GetComponent<Camera>().rect = PhysicalScreenViewport.Full;
+            frame.Refresh();
+            Assert.That(frame.RigRoot, Is.SameAs(root));
+            Assert.That(root.localPosition, Is.EqualTo(Vector3.zero));
+        }
+
         [TestCase(true, true)]
         [TestCase(true, false)]
         [TestCase(false, true)]

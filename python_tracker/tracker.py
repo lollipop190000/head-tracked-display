@@ -11,15 +11,16 @@ import cv2
 import mediapipe as mp
 from pose_estimator import PoseEstimator
 from session_lifetime import SessionLifetime
+from camera_control import BACKENDS, CameraControl, discover_cameras, select_camera, frame_status
 
 ROOT = Path(__file__).resolve().parent
 
 
-def open_camera(index: int, width: int, height: int) -> cv2.VideoCapture:
-    backend = cv2.CAP_DSHOW if hasattr(cv2, "CAP_DSHOW") else cv2.CAP_ANY
-    camera = cv2.VideoCapture(index, backend)
+def open_camera(index: int, width: int, height: int, backend="dshow") -> cv2.VideoCapture:
+    camera = cv2.VideoCapture(index, BACKENDS[backend])
     if not camera.isOpened():
-        raise RuntimeError(f"Cannot open webcam index {index}")
+        camera.release()
+        raise RuntimeError(f"Cannot open webcam index {index} ({backend})")
     camera.set(cv2.CAP_PROP_FRAME_WIDTH, width)
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
     camera.set(cv2.CAP_PROP_FPS, 60)
@@ -110,7 +111,10 @@ def run(args: argparse.Namespace) -> None:
     model = Path(args.model)
     if not model.exists():
         raise FileNotFoundError(f"Missing {model}; run download_model.py first")
-    camera = open_camera(args.camera, args.width, args.height)
+    directory = Path(args.calibration_file).parent if args.calibration_file else None
+    controls = CameraControl(directory)
+    device = select_camera(controls.devices, args.camera, args.camera_backend, controls.preference())
+    camera = open_camera(device["index"], args.width, args.height, device["backend"])
     options = mp.tasks.vision.FaceLandmarkerOptions(
         base_options=mp.tasks.BaseOptions(model_asset_path=str(model)),
         running_mode=mp.tasks.vision.RunningMode.VIDEO,
@@ -122,23 +126,102 @@ def run(args: argparse.Namespace) -> None:
     pose = PoseEstimator(args.calibration_file)
     capture = LatestFrameCamera(camera)
     sequence = 0
+    packet_sequence = 0
+    last_status = 0.0
+    opened_at = time.monotonic()
+    previous_device = None
+    awaiting_first_frame = True
+    save_selection = False
+    camera_error = ""
+    next_control_poll = 0.0
+    frame_width = frame_height = 0
+    last_frame_at = opened_at
+    last_blank = False
+    controls.publish(device, "Opening camera")
     last_result = time.monotonic()
     fps = 0.0
     deadline = time.monotonic() + args.benchmark_seconds if args.benchmark_seconds > 0 else float("inf")
     stats = []
-    print(f"Webcam {args.camera} opened. Waiting for Unity at 127.0.0.1:{args.port}. Ctrl+C to stop.")
+    print(f"Webcam {device['index']}: {device['name']} ({device['backend']}) opened. Waiting for Unity at 127.0.0.1:{args.port}. Ctrl+C to stop.")
     try:
         with mp.tasks.vision.FaceLandmarker.create_from_options(options) as landmarker:
             while time.monotonic() < deadline:
                 if not lifetime.is_active():
                     print("Launcher session ended; releasing webcam.")
                     break
+                request = None
+                if time.monotonic() >= next_control_poll:
+                    request = controls.request()
+                    next_control_poll = time.monotonic() + .25
+                if request and request["action"] == "select":
+                    requested = request["device"]
+                    if requested is None:
+                        camera_error = "Selected camera is no longer connected. Refresh the list."
+                    elif requested["id"] != device["id"]:
+                        previous_device = device
+                        capture.close()
+                        try:
+                            camera = open_camera(requested["index"], args.width, args.height, requested["backend"])
+                            device = requested
+                            save_selection = True
+                            camera_error = ""
+                        except Exception as error:
+                            camera_error = str(error) + "; restored previous camera."
+                            camera = open_camera(device["index"], args.width, args.height, device["backend"])
+                            previous_device = None
+                            save_selection = False
+                        capture = LatestFrameCamera(camera)
+                        sequence = 0
+                        opened_at = time.monotonic()
+                        awaiting_first_frame = True
+                        frame_width = frame_height = 0
+                        last_frame_at = opened_at
+                        last_blank = False
+                        pose = PoseEstimator(args.calibration_file)
+                        print(f"Selected webcam {device['index']}: {device['name']} ({device['backend']})", flush=True)
+                        # Drop the old camera's face while waiting for a fresh frame.
+                        if connection:
+                            try:
+                                connection.sendall(b'{"found":false,"width":0,"height":0}\n')
+                            except OSError:
+                                connection.close()
+                                connection = None
                 newest = capture.get_after(sequence)
                 if newest is None:
+                    now = time.monotonic()
+                    if awaiting_first_frame and previous_device and now - opened_at > 5:
+                        capture.close()
+                        failed = device
+                        device = previous_device
+                        previous_device = None
+                        camera = open_camera(device["index"], args.width, args.height, device["backend"])
+                        capture = LatestFrameCamera(camera)
+                        sequence = 0
+                        opened_at = now
+                        save_selection = False
+                        camera_error = f"No frames from {failed['name']}; restored previous camera."
+                    if now - last_status >= 1:
+                        controls.publish(device, frame_status(frame_width, frame_height, now - last_frame_at, last_blank),
+                                         camera_error, frame_width, frame_height, last_blank)
+                        last_status = now
                     time.sleep(.002)
                     continue
                 sequence, captured_at, frame = newest
                 height, width = frame.shape[:2]
+                frame_width, frame_height = width, height
+                last_frame_at = time.monotonic()
+                last_blank = bool(frame[::16, ::16].max() <= 1)
+                if awaiting_first_frame:
+                    awaiting_first_frame = False
+                    previous_device = None
+                    if save_selection:
+                        controls.remember(device)
+                        save_selection = False
+                now = time.monotonic()
+                if now - last_status >= 1:
+                    controls.publish(device, frame_status(width, height, 0, last_blank),
+                                     camera_error, width, height, last_blank)
+                    last_status = now
                 rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
                 timestamp = max(int(captured_at * 1000), last_timestamp + 1)
@@ -151,7 +234,8 @@ def run(args: argparse.Namespace) -> None:
                 instantaneous_fps = 1 / max(.001, completed - last_result)
                 fps = instantaneous_fps if not fps else .9 * fps + .1 * instantaneous_fps
                 last_result = completed
-                message.update(sequence=sequence, inferenceMs=inference_ms, trackerFps=fps,
+                packet_sequence += 1
+                message.update(sequence=packet_sequence, inferenceMs=inference_ms, trackerFps=fps,
                                frameAgeMs=(completed - captured_at) * 1000)
                 if args.benchmark_seconds > 0:
                     stats.append((inference_ms, message.get("poseMs", 0.), message["frameAgeMs"],
@@ -172,6 +256,7 @@ def run(args: argparse.Namespace) -> None:
                         print("Unity disconnected; reconnecting")
     finally:
         capture.close()
+        controls.publish(device, "Tracker stopped")
         if connection:
             connection.close()
         if stats:
@@ -187,8 +272,9 @@ def run(args: argparse.Namespace) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--list-cameras", action="store_true", help="Probe camera indices 0-5 and exit")
-    parser.add_argument("--camera", type=int, default=0, help="OpenCV camera index")
+    parser.add_argument("--list-cameras", action="store_true", help="List webcam names and indices for each Windows capture backend")
+    parser.add_argument("--camera", type=int, default=None, help="Explicit OpenCV camera index; otherwise restore the selected device or use 0")
+    parser.add_argument("--camera-backend", choices=BACKENDS, default="dshow")
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
     parser.add_argument("--port", type=int, default=8765)
@@ -198,11 +284,8 @@ if __name__ == "__main__":
     parser.add_argument("--benchmark-seconds", type=float, default=0, help="Capture briefly, report timings, and exit")
     arguments = parser.parse_args()
     if arguments.list_cameras:
-        for index in range(6):
-            probe = cv2.VideoCapture(index, cv2.CAP_DSHOW)
-            if probe.isOpened():
-                print(f"Camera {index}: available")
-            probe.release()
+        for device in discover_cameras():
+            print(f"Camera {device['index']} ({device['backend']}): {device['name']}")
         raise SystemExit(0)
     try:
         run(arguments)
